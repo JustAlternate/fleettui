@@ -7,25 +7,28 @@ import (
 
 	"fleettui/internal/adapters/output/ssh"
 	"fleettui/internal/domain"
-	"fleettui/internal/ports/output"
 )
 
 type MetricsCollector struct {
-	config    *domain.Config
-	nodes     []*domain.Node
-	collector output.MetricsCollector
-	mu        sync.RWMutex
+	config *domain.Config
+	nodes  []*domain.Node
+	pool   *ssh.ConnectionPool
+	mu     sync.RWMutex
 }
 
-func NewMetricsCollector(config *domain.Config, nodes []*domain.Node, collector output.MetricsCollector) *MetricsCollector {
+func NewMetricsCollector(config *domain.Config, nodes []*domain.Node) *MetricsCollector {
 	return &MetricsCollector{
-		config:    config,
-		nodes:     nodes,
-		collector: collector,
+		config: config,
+		nodes:  nodes,
+		pool:   ssh.NewConnectionPool(),
 	}
 }
 
 func (mc *MetricsCollector) CollectAll(ctx context.Context) {
+	// Create timeout context for entire collection cycle
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
 	var wg sync.WaitGroup
 
 	for _, node := range mc.nodes {
@@ -40,20 +43,41 @@ func (mc *MetricsCollector) CollectAll(ctx context.Context) {
 }
 
 func (mc *MetricsCollector) collectNode(ctx context.Context, node *domain.Node) {
-	client := ssh.NewClient()
+	// Check if node is in backoff
+	if mc.pool.IsInBackoff(node.IP) {
+		node.Error = "Connection failed, backing off..."
+		node.Metrics.Connectivity = false
+		node.LastUpdated = time.Now()
+		return
+	}
+
+	// Get connection from pool
+	client, err := mc.pool.Get(ctx, node)
+	if err != nil {
+		mc.pool.RecordFailure(node.IP)
+		node.Error = err.Error()
+		node.Metrics.Connectivity = false
+		node.LastUpdated = time.Now()
+		return
+	}
+
+	// Return connection to pool when done (doesn't close it)
+	defer mc.pool.Return(node.IP)
+
 	collector := ssh.NewCollector(client)
 
 	metrics, err := collector.CollectMetrics(ctx, node, mc.config)
 	if err != nil {
+		mc.pool.RecordFailure(node.IP)
 		node.Error = err.Error()
 		node.Metrics.Connectivity = false
 	} else {
+		mc.pool.RecordSuccess(node.IP)
 		node.Error = ""
 		node.Metrics = *metrics
 	}
 
 	node.LastUpdated = time.Now()
-	client.Disconnect()
 }
 
 func (mc *MetricsCollector) GetNodes() []*domain.Node {
@@ -69,14 +93,21 @@ func (mc *MetricsCollector) Start(ctx context.Context) {
 	ticker := time.NewTicker(mc.config.RefreshRate)
 	defer ticker.Stop()
 
+	// Cleanup idle connections periodically
+	cleanupTicker := time.NewTicker(1 * time.Minute)
+	defer cleanupTicker.Stop()
+
 	mc.CollectAll(ctx)
 
 	for {
 		select {
 		case <-ctx.Done():
+			mc.pool.CloseAll()
 			return
 		case <-ticker.C:
 			mc.CollectAll(ctx)
+		case <-cleanupTicker.C:
+			mc.pool.CleanupIdle()
 		}
 	}
 }

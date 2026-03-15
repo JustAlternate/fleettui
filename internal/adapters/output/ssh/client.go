@@ -3,6 +3,7 @@ package ssh
 import (
 	"context"
 	"fmt"
+	"net"
 	"os"
 	"time"
 
@@ -44,14 +45,29 @@ func (c *Client) Connect(ctx context.Context, node *domain.Node) error {
 			ssh.PublicKeys(signer),
 		},
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-		Timeout:         10 * time.Second,
 	}
 
 	addr := fmt.Sprintf("%s:22", node.IP)
-	client, err := ssh.Dial("tcp", addr, config)
+
+	// Use context-aware dialer
+	dialer := &net.Dialer{
+		Timeout:   10 * time.Second,
+		KeepAlive: 30 * time.Second,
+	}
+
+	conn, err := dialer.DialContext(ctx, "tcp", addr)
 	if err != nil {
 		return fmt.Errorf("failed to connect to %s: %w", node.IP, err)
 	}
+
+	// Create SSH connection over the TCP connection
+	sshConn, chans, reqs, err := ssh.NewClientConn(conn, addr, config)
+	if err != nil {
+		conn.Close()
+		return fmt.Errorf("failed to establish SSH connection to %s: %w", node.IP, err)
+	}
+
+	client := ssh.NewClient(sshConn, chans, reqs)
 
 	c.client = client
 	c.node = node
@@ -70,18 +86,41 @@ func (c *Client) ExecuteCommand(ctx context.Context, command string) (string, er
 		return "", fmt.Errorf("not connected")
 	}
 
+	// Check context before starting
+	select {
+	case <-ctx.Done():
+		return "", ctx.Err()
+	default:
+	}
+
 	session, err := c.client.NewSession()
 	if err != nil {
 		return "", fmt.Errorf("failed to create session: %w", err)
 	}
 	defer session.Close()
 
-	output, err := session.CombinedOutput(command)
-	if err != nil {
-		return string(output), fmt.Errorf("command failed: %w", err)
-	}
+	// Execute command with context awareness
+	outputCh := make(chan []byte, 1)
+	errCh := make(chan error, 1)
 
-	return string(output), nil
+	go func() {
+		output, err := session.CombinedOutput(command)
+		if err != nil {
+			errCh <- err
+			return
+		}
+		outputCh <- output
+	}()
+
+	select {
+	case <-ctx.Done():
+		session.Signal(ssh.SIGTERM)
+		return "", ctx.Err()
+	case err := <-errCh:
+		return "", fmt.Errorf("command failed: %w", err)
+	case output := <-outputCh:
+		return string(output), nil
+	}
 }
 
 func (c *Client) IsConnected() bool {

@@ -73,7 +73,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	collector := service.NewMetricsCollector(cfg, nodes, nil)
+	collector := service.NewMetricsCollector(cfg, nodes)
 
 	model := tui.NewModel(nodes, cfg, collector)
 
