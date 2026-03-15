@@ -48,6 +48,10 @@ func (n *Node) IsAvailable() bool {
 	return n.Error == "" && n.Metrics.Connectivity
 }
 
+func (n *Node) IsPending() bool {
+	return n.LastUpdated.IsZero()
+}
+
 func (n *Node) HasFailedUnits() bool {
 	return n.Metrics.Systemd.FailedCount > 0
 }

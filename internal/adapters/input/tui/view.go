@@ -63,8 +63,15 @@ func (m *Model) renderNodeCard(node *domain.Node) string {
 	var lines []string
 
 	status := "●"
-	statusStyle := GetStatusStyle(node.IsAvailable())
-	if !node.IsAvailable() && node.Error != "" {
+	var statusStyle lipgloss.Style
+
+	if node.IsPending() {
+		statusStyle = PendingStyle
+	} else if node.IsAvailable() {
+		statusStyle = SuccessStyle
+	} else if node.Error != "" {
+		statusStyle = ErrorStyle
+	} else {
 		statusStyle = ErrorStyle
 	}
 
@@ -77,7 +84,9 @@ func (m *Model) renderNodeCard(node *domain.Node) string {
 
 	lines = append(lines, m.renderRow("IP:", node.IP))
 
-	if !node.IsAvailable() {
+	if node.IsPending() {
+		lines = append(lines, m.renderRow("Status:", PendingStyle.Render("Pending")))
+	} else if !node.IsAvailable() {
 		if node.Error != "" {
 			lines = append(lines, m.renderRow("Status:", ErrorStyle.Render("Error")))
 			lines = append(lines, m.renderRow("Error:", truncateString(node.Error, 25)))

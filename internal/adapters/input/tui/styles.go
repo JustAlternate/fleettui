@@ -37,6 +37,9 @@ var (
 	WarningStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#FFA500"))
 
+	PendingStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#FFD700"))
+
 	HelpStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#666666")).
 			Padding(1, 0)
