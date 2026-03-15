@@ -47,7 +47,7 @@ func (c *Client) Connect(ctx context.Context, node *domain.Node) error {
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
 
-	addr := fmt.Sprintf("%s:22", node.IP)
+	addr := parseAddr(node.IP)
 
 	// Use context-aware dialer
 	dialer := &net.Dialer{
@@ -125,4 +125,11 @@ func (c *Client) ExecuteCommand(ctx context.Context, command string) (string, er
 
 func (c *Client) IsConnected() bool {
 	return c.client != nil
+}
+
+func parseAddr(ip string) string {
+	if _, _, err := net.SplitHostPort(ip); err == nil {
+		return ip
+	}
+	return fmt.Sprintf("%s:22", ip)
 }

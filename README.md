@@ -27,6 +27,16 @@ go install .
 nix run github:JustAlternate/fleettui
 ```
 
+## Usage
+
+```bash
+# Run with default config (~/.config/fleettui/)
+fleettui
+
+# Specify custom hosts file
+fleettui -hosts ./hosts.yaml
+```
+
 ## Configuration
 
 ### Hosts Configuration (`hosts.yaml`)
@@ -34,14 +44,18 @@ nix run github:JustAlternate/fleettui
 ```yaml
 hosts:
   - name: server-01              # Display name
-    ip: 192.168.1.10             # IP address or hostname
+    ip: 192.168.1.10             # IP address (default SSH port 22)
     user: root                   # SSH user (default: root)
     ssh_key_path: ~/.ssh/id_rsa  # Optional: specific SSH key
+  - name: server-02
+    ip: 192.168.1.11:2222        # Custom SSH port supported
+    user: admin
 ```
 
 **Notes:**
 - If `user` is not specified, defaults to `root`
 - If `ssh_key_path` is not specified, uses the first key found in `~/.ssh/`
+- Custom SSH port can be specified in `ip` field (e.g., `192.168.1.10:2222`)
 
 ### Application Configuration (`config.yaml`)
 

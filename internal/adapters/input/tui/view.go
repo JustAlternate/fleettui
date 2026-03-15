@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"fleettui/internal/domain"
 	"github.com/charmbracelet/lipgloss"
@@ -15,19 +16,20 @@ func (m *Model) renderView() string {
 
 	var sections []string
 
-	title := TitleStyle.Render(" FleetTUI - Node Monitor ")
-	sections = append(sections, title)
+	title := TitleStyle.Render("FleetTUI")
+	stats := StatsStyle.Render(m.renderStats())
+	header := lipgloss.JoinHorizontal(lipgloss.Top, title, stats)
+	sections = append(sections, HeaderStyle.Render(header))
 
-	cards := m.renderCards()
-	sections = append(sections, cards)
+	sections = append(sections, m.viewport.View())
 
-	help := HelpStyle.Render("[q/esc/ctrl+c] Quit • [r] Refresh")
+	help := HelpStyle.Render("[q] Quit • [r] Refresh • [j/k] Scroll")
 	sections = append(sections, help)
 
 	return lipgloss.JoinVertical(lipgloss.Left, sections...)
 }
 
-func (m *Model) renderCards() string {
+func (m *Model) renderCardsContent() string {
 	if len(m.nodes) == 0 {
 		return "\n  No hosts configured.\n  Add hosts to ~/.config/fleettui/hosts.yaml\n"
 	}
@@ -38,13 +40,7 @@ func (m *Model) renderCards() string {
 		cards = append(cards, card)
 	}
 
-	columns := 3
-	if m.width < 130 {
-		columns = 2
-	}
-	if m.width < 90 {
-		columns = 1
-	}
+	columns := m.getColumns()
 
 	var rows []string
 	for i := 0; i < len(cards); i += columns {
@@ -59,23 +55,48 @@ func (m *Model) renderCards() string {
 	return lipgloss.JoinVertical(lipgloss.Left, rows...)
 }
 
+func (m *Model) renderStats() string {
+	total := len(m.nodes)
+	healthy := 0
+	offline := 0
+	for _, node := range m.nodes {
+		if node.IsAvailable() {
+			healthy++
+		} else if !node.IsPending() {
+			offline++
+		}
+	}
+
+	separator := lipgloss.NewStyle().Foreground(lipgloss.Color("#444444")).Render("│")
+
+	healthyStr := fmt.Sprintf("%d/%d healthy", healthy, total)
+	if healthy == total {
+		healthyStr = fmt.Sprintf("%d healthy", total)
+	}
+
+	healthyStyled := StatsHealthyStyle.Render(healthyStr)
+	intervalStr := fmt.Sprintf("%ds", m.config.RefreshRate/time.Second)
+	intervalStyled := StatsLabelStyle.Render(intervalStr)
+
+	if offline > 0 {
+		offlineStyled := CriticalStyle.Render(fmt.Sprintf("%d offline", offline))
+		return fmt.Sprintf(" %s %s %s %s %s ", separator, healthyStyled, separator, offlineStyled, intervalStyled)
+	}
+
+	return fmt.Sprintf(" %s %s %s ", separator, healthyStyled, intervalStyled)
+}
+
+func (m *Model) renderCards() string {
+	return m.renderCardsContent()
+}
+
 func (m *Model) renderNodeCard(node *domain.Node) string {
 	var lines []string
 
-	status := "●"
-	var statusStyle lipgloss.Style
+	statusDot := GetAnimatedDot(m.animationFrame, node)
+	statusStyle := GetStatusStyle(node)
 
-	if node.IsPending() {
-		statusStyle = PendingStyle
-	} else if node.IsAvailable() {
-		statusStyle = SuccessStyle
-	} else if node.Error != "" {
-		statusStyle = ErrorStyle
-	} else {
-		statusStyle = ErrorStyle
-	}
-
-	title := CardTitleStyle.Render(fmt.Sprintf("%s %s", statusStyle.Render(status), node.Name))
+	title := CardTitleStyle.Render(fmt.Sprintf("%s %s", statusStyle.Render(statusDot), node.Name))
 	lines = append(lines, title)
 
 	if m.config.IsMetricEnabled(domain.MetricOS) && node.OSInfo != "" {
@@ -85,13 +106,13 @@ func (m *Model) renderNodeCard(node *domain.Node) string {
 	lines = append(lines, m.renderRow("IP:", node.IP))
 
 	if node.IsPending() {
-		lines = append(lines, m.renderRow("Status:", PendingStyle.Render("Pending")))
+		lines = append(lines, m.renderRow("Status:", PendingStyle.Render("Connecting...")))
 	} else if !node.IsAvailable() {
 		if node.Error != "" {
-			lines = append(lines, m.renderRow("Status:", ErrorStyle.Render("Error")))
+			lines = append(lines, m.renderRow("Status:", CriticalStyle.Render("Error")))
 			lines = append(lines, m.renderRow("Error:", truncateString(node.Error, 25)))
 		} else {
-			lines = append(lines, m.renderRow("Status:", ErrorStyle.Render("Offline")))
+			lines = append(lines, m.renderRow("Status:", CriticalStyle.Render("Offline")))
 		}
 	} else {
 		lines = append(lines, m.renderRow("Status:", SuccessStyle.Render("Online")))
@@ -126,7 +147,8 @@ func (m *Model) renderNodeCard(node *domain.Node) string {
 	}
 
 	content := lipgloss.JoinVertical(lipgloss.Left, lines...)
-	return CardStyle.Render(content)
+	cardStyle := GetCardStyle(node)
+	return cardStyle.Render(content)
 }
 
 func (m *Model) renderRow(label, value string) string {
@@ -156,8 +178,12 @@ func renderProgressBar(percent float64, width int) string {
 	}
 	empty := width - filled
 
-	color := GetBarColor(percent)
-	filledBar := lipgloss.NewStyle().Foreground(color).Render(strings.Repeat("█", filled))
+	var filledBar string
+	for i := 0; i < filled; i++ {
+		segmentPercent := float64(i+1) / float64(width) * 100
+		color := GetGradientColor(segmentPercent)
+		filledBar += lipgloss.NewStyle().Foreground(color).Render("█")
+	}
 	emptyBar := ProgressBarEmptyStyle.Render(strings.Repeat("░", empty))
 
 	return filledBar + emptyBar

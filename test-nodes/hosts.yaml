@@ -1,0 +1,76 @@
+hosts:
+  - name: node-1
+    ip: 127.0.0.1:2201
+    user: root
+  - name: node-2
+    ip: 127.0.0.1:2202
+    user: root
+  - name: node-3
+    ip: 127.0.0.1:2203
+    user: root
+  - name: node-4
+    ip: 127.0.0.1:2204
+    user: root
+  - name: node-5
+    ip: 127.0.0.1:2205
+    user: root
+  - name: node-6
+    ip: 127.0.0.1:2206
+    user: root
+  - name: node-7
+    ip: 127.0.0.1:2207
+    user: root
+  - name: node-8
+    ip: 127.0.0.1:2208
+    user: root
+  - name: node-9
+    ip: 127.0.0.1:2209
+    user: root
+  - name: node-10
+    ip: 127.0.0.1:2210
+    user: root
+  - name: node-11
+    ip: 127.0.0.1:2211
+    user: root
+  - name: node-12
+    ip: 127.0.0.1:2212
+    user: root
+  - name: node-13
+    ip: 127.0.0.1:2213
+    user: root
+  - name: node-14
+    ip: 127.0.0.1:2214
+    user: root
+  - name: node-15
+    ip: 127.0.0.1:2215
+    user: root
+  - name: node-16
+    ip: 127.0.0.1:2216
+    user: root
+  - name: node-17
+    ip: 127.0.0.1:2217
+    user: root
+  - name: node-18
+    ip: 127.0.0.1:2218
+    user: root
+  - name: node-19
+    ip: 127.0.0.1:2219
+    user: root
+  - name: node-20
+    ip: 127.0.0.1:2220
+    user: root
+  - name: node-21
+    ip: 127.0.0.1:2221
+    user: root
+  - name: node-22
+    ip: 127.0.0.1:2222
+    user: root
+  - name: node-23
+    ip: 127.0.0.1:2223
+    user: root
+  - name: node-24
+    ip: 127.0.0.1:2224
+    user: root
+  - name: node-25
+    ip: 127.0.0.1:2225
+    user: root
