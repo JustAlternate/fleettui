@@ -2,7 +2,7 @@
 
 A TUI for monitoring your server fleet in real-time. Built with Go and the [Charm](https://charm.sh) stack.
 
-![FleetTUI Demo](assets/demo.png)
+![FleetTUI Demo](assets/demo.gif)
 
 ## Features
 
