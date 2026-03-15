@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -17,29 +18,36 @@ import (
 )
 
 func main() {
+	hostsFlag := flag.String("hosts", "", "Path to hosts.yaml (default: ~/.config/fleettui/hosts.yaml)")
+	flag.Parse()
+
 	configDir := filepath.Join(os.Getenv("HOME"), ".config", "fleettui")
 	configPath := filepath.Join(configDir, "config.yaml")
 	hostsPath := filepath.Join(configDir, "hosts.yaml")
 
-	// Check if this is the first run
-	if _, err := os.Stat(configDir); os.IsNotExist(err) {
-		fmt.Println("Welcome to FleetTUI!")
-		fmt.Println("It looks like this is your first time running the application.")
-		fmt.Println()
+	if *hostsFlag != "" {
+		hostsPath = *hostsFlag
+	}
 
-		// Run onboarding
-		completed, err := onboarding.Run()
-		if err != nil {
-			log.Fatalf("Onboarding failed: %v", err)
+	if *hostsFlag == "" {
+		if _, err := os.Stat(configDir); os.IsNotExist(err) {
+			fmt.Println("Welcome to FleetTUI!")
+			fmt.Println("It looks like this is your first time running the application.")
+			fmt.Println()
+
+			completed, err := onboarding.Run()
+			if err != nil {
+				log.Fatalf("Onboarding failed: %v", err)
+			}
+
+			if !completed {
+				fmt.Println("\nOnboarding cancelled. Exiting...")
+				os.Exit(0)
+			}
+
+			fmt.Println("\nConfiguration complete! Starting FleetTUI...")
+			fmt.Println()
 		}
-
-		if !completed {
-			fmt.Println("\nOnboarding cancelled. Exiting...")
-			os.Exit(0)
-		}
-
-		fmt.Println("\nConfiguration complete! Starting FleetTUI...")
-		fmt.Println()
 	}
 
 	loader := config.NewLoader()
@@ -84,7 +92,7 @@ func main() {
 
 	model := tui.NewModel(nodes, cfg, collector)
 
-	p := tea.NewProgram(model, tea.WithAltScreen())
+	p := tea.NewProgram(model, tea.WithAltScreen(), tea.WithMouseCellMotion())
 	if _, err := p.Run(); err != nil {
 		log.Fatalf("Error running program: %v", err)
 	}
