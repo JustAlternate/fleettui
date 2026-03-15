@@ -25,7 +25,7 @@
 
             src = ./.;
 
-            vendorHash = "sha256-vdrfeSJbLGx9Fk9imUZXQdx+leJCDGZtyyKn06iJDa8=";
+            vendorHash = "sha256-GgS3itX4+/GsdP2dCZCYtMqql9lY/kddicYVQQ+NcoE=";
 
             meta = with pkgs.lib; {
               description = "A TUI for managing and monitoring server fleets";

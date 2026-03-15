@@ -24,7 +24,7 @@ go install .
 ### Using Nix (with flakes)
 
 ```bash
-nix run github.com/JustAlternate/fleettui
+nix run github:JustAlternate/fleettui
 ```
 
 ## Configuration
