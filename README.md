@@ -57,13 +57,6 @@ metrics:                      # Enabled metrics
   - os                        # OS name from /etc/os-release
 ```
 
-## Usage
-
-```
-[q/esc/ctrl+c]  Quit
-[r]             Force refresh
-```
-
 ## Requirements
 
 - Remote hosts must have standard Linux utilities (`top`, `free`, `cat`, `systemctl`)
@@ -75,9 +68,6 @@ metrics:                      # Enabled metrics
 git clone https://github.com/JustAlternate/fleettui.git
 cd fleettui
 go build .
-
-# Run tests
-go test ./...
 ```
 
 ## License
