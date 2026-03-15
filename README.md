@@ -21,41 +21,11 @@ cd fleettui
 go install .
 ```
 
-## Quick Start
+### Using Nix (with flakes)
 
-1. **Create the configuration directory:**
-   ```bash
-   mkdir -p ~/.config/fleettui
-   ```
-
-2. **Create `~/.config/fleettui/hosts.yaml`:**
-   ```yaml
-   hosts:
-     - name: web-server-01
-       ip: 192.168.1.10
-       user: root
-     - name: database-01
-       ip: 192.168.1.20
-       user: admin
-   ```
-
-3. **Create `~/.config/fleettui/config.yaml` (optional):**
-   ```yaml
-   refresh_rate: 5s
-   metrics:
-     - cpu
-     - ram
-     - network
-     - connectivity
-     - uptime
-     - systemd
-     - os
-   ```
-
-4. **Run FleetTUI:**
-   ```bash
-   fleettui
-   ```
+```bash
+nix run github.com/JustAlternate/fleettui
+```
 
 ## Configuration
 
