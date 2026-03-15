@@ -21,7 +21,6 @@ func (m *Model) renderView() string {
 	header := lipgloss.JoinHorizontal(lipgloss.Top, title, stats)
 	sections = append(sections, HeaderStyle.Render(header))
 
-	sections = append(sections, "\n")
 	sections = append(sections, m.viewport.View())
 
 	help := HelpStyle.Render("[q] Quit • [r] Refresh • [j/k] Scroll")

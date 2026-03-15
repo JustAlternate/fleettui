@@ -58,7 +58,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		m.viewport.Width = m.width
-		m.viewport.Height = m.height - 7
+		m.viewport.Height = m.height - 6
 		m.updateViewportContent()
 
 	case tickMsg:

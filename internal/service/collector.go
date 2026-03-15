@@ -59,25 +59,14 @@ func (mc *MetricsCollector) collectNode(ctx context.Context, node *domain.Node) 
 
 	var collector output.MetricsCollector
 
-	if mc.collectorFactory != nil {
-		// Use factory pattern for testability
-		collector = mc.collectorFactory(node)
-	} else {
-		// Get connection from pool
-		client, err := mc.pool.Get(ctx, node)
-		if err != nil {
-			mc.pool.RecordFailure(node.IP)
-			node.Error = err.Error()
-			node.Metrics.Connectivity = false
-			node.LastUpdated = time.Now()
-			return
-		}
-
-		// Return connection to pool when done (doesn't close it)
-		defer mc.pool.Return(node.IP)
-
-		collector = ssh.NewCollector(client)
+	if mc.collectorFactory == nil {
+		node.Error = "collector factory not configured"
+		node.Metrics.Connectivity = false
+		node.LastUpdated = time.Now()
+		return
 	}
+
+	collector = mc.collectorFactory(node)
 
 	metrics, err := collector.CollectMetrics(ctx, node, mc.config)
 	if err != nil {
