@@ -8,8 +8,10 @@ import (
 
 	"fleettui/internal/adapters/input/tui"
 	"fleettui/internal/adapters/output/config"
+	"fleettui/internal/adapters/output/ssh"
 	"fleettui/internal/domain"
 	"fleettui/internal/onboarding"
+	"fleettui/internal/ports/output"
 	"fleettui/internal/service"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -73,7 +75,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	collector := service.NewMetricsCollector(cfg, nodes)
+	collectorFactory := func(node *domain.Node) output.MetricsCollector {
+		client := ssh.NewClient()
+		return ssh.NewCollector(client)
+	}
+
+	collector := service.NewMetricsCollector(cfg, nodes, collectorFactory)
 
 	model := tui.NewModel(nodes, cfg, collector)
 

@@ -70,6 +70,25 @@ cd fleettui
 go build .
 ```
 
+## Testing
+
+Run all tests:
+```bash
+go test ./...
+```
+
+Run with coverage:
+```bash
+go test -cover ./...
+```
+
+### Generating Mocks
+
+When interface changes require new mocks, run:
+```bash
+mockery --all
+```
+
 ## License
 
 MIT License.

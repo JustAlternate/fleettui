@@ -1,0 +1,16 @@
+# Mockery configuration for FleetTUI
+all: true
+dir: internal/mocks
+mockname: "Mock{{.InterfaceName}}"
+outpkg: mocks
+with-expecter: true
+keeptree: false
+packages:
+  fleettui/internal/ports/output:
+    interfaces:
+      SSHClient:
+        config:
+          dir: internal/mocks
+      MetricsCollector:
+        config:
+          dir: internal/mocks

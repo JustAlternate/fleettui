@@ -7,20 +7,26 @@ import (
 
 	"fleettui/internal/adapters/output/ssh"
 	"fleettui/internal/domain"
+	"fleettui/internal/ports/output"
 )
 
+// CollectorFactory creates a MetricsCollector for a specific node
+type CollectorFactory func(node *domain.Node) output.MetricsCollector
+
 type MetricsCollector struct {
-	config *domain.Config
-	nodes  []*domain.Node
-	pool   *ssh.ConnectionPool
-	mu     sync.RWMutex
+	config           *domain.Config
+	nodes            []*domain.Node
+	pool             *ssh.ConnectionPool
+	collectorFactory CollectorFactory
+	mu               sync.RWMutex
 }
 
-func NewMetricsCollector(config *domain.Config, nodes []*domain.Node) *MetricsCollector {
+func NewMetricsCollector(config *domain.Config, nodes []*domain.Node, collectorFactory CollectorFactory) *MetricsCollector {
 	return &MetricsCollector{
-		config: config,
-		nodes:  nodes,
-		pool:   ssh.NewConnectionPool(),
+		config:           config,
+		nodes:            nodes,
+		pool:             ssh.NewConnectionPool(),
+		collectorFactory: collectorFactory,
 	}
 }
 
@@ -51,20 +57,27 @@ func (mc *MetricsCollector) collectNode(ctx context.Context, node *domain.Node) 
 		return
 	}
 
-	// Get connection from pool
-	client, err := mc.pool.Get(ctx, node)
-	if err != nil {
-		mc.pool.RecordFailure(node.IP)
-		node.Error = err.Error()
-		node.Metrics.Connectivity = false
-		node.LastUpdated = time.Now()
-		return
+	var collector output.MetricsCollector
+
+	if mc.collectorFactory != nil {
+		// Use factory pattern for testability
+		collector = mc.collectorFactory(node)
+	} else {
+		// Get connection from pool
+		client, err := mc.pool.Get(ctx, node)
+		if err != nil {
+			mc.pool.RecordFailure(node.IP)
+			node.Error = err.Error()
+			node.Metrics.Connectivity = false
+			node.LastUpdated = time.Now()
+			return
+		}
+
+		// Return connection to pool when done (doesn't close it)
+		defer mc.pool.Return(node.IP)
+
+		collector = ssh.NewCollector(client)
 	}
-
-	// Return connection to pool when done (doesn't close it)
-	defer mc.pool.Return(node.IP)
-
-	collector := ssh.NewCollector(client)
 
 	metrics, err := collector.CollectMetrics(ctx, node, mc.config)
 	if err != nil {
