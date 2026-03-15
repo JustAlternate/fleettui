@@ -9,6 +9,7 @@ import (
 	"fleettui/internal/adapters/input/tui"
 	"fleettui/internal/adapters/output/config"
 	"fleettui/internal/domain"
+	"fleettui/internal/onboarding"
 	"fleettui/internal/service"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -17,6 +18,27 @@ func main() {
 	configDir := filepath.Join(os.Getenv("HOME"), ".config", "fleettui")
 	configPath := filepath.Join(configDir, "config.yaml")
 	hostsPath := filepath.Join(configDir, "hosts.yaml")
+
+	// Check if this is the first run
+	if _, err := os.Stat(configDir); os.IsNotExist(err) {
+		fmt.Println("Welcome to FleetTUI!")
+		fmt.Println("It looks like this is your first time running the application.")
+		fmt.Println()
+
+		// Run onboarding
+		completed, err := onboarding.Run()
+		if err != nil {
+			log.Fatalf("Onboarding failed: %v", err)
+		}
+
+		if !completed {
+			fmt.Println("\nOnboarding cancelled. Exiting...")
+			os.Exit(0)
+		}
+
+		fmt.Println("\nConfiguration complete! Starting FleetTUI...")
+		fmt.Println()
+	}
 
 	loader := config.NewLoader()
 

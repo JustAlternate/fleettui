@@ -134,3 +134,38 @@ func (l *Loader) findFirstSSHKey(sshDir string) string {
 
 	return ""
 }
+
+func (l *Loader) SaveHosts(path string, hostsConfig *domain.HostsConfig) error {
+	data, err := yaml.Marshal(hostsConfig)
+	if err != nil {
+		return fmt.Errorf("failed to marshal hosts config: %w", err)
+	}
+
+	if err := os.WriteFile(path, data, 0644); err != nil {
+		return fmt.Errorf("failed to write hosts file: %w", err)
+	}
+
+	return nil
+}
+
+func (l *Loader) SaveConfig(path string, config *domain.Config) error {
+	yamlCfg := yamlConfig{
+		RefreshRate: "5s",
+		Metrics:     make([]string, len(config.EnabledMetrics)),
+	}
+
+	for i, metric := range config.EnabledMetrics {
+		yamlCfg.Metrics[i] = string(metric)
+	}
+
+	data, err := yaml.Marshal(yamlCfg)
+	if err != nil {
+		return fmt.Errorf("failed to marshal config: %w", err)
+	}
+
+	if err := os.WriteFile(path, data, 0644); err != nil {
+		return fmt.Errorf("failed to write config file: %w", err)
+	}
+
+	return nil
+}

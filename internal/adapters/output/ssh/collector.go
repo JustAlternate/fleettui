@@ -22,9 +22,8 @@ func NewCollector(client output.SSHClient) output.MetricsCollector {
 func (c *Collector) CollectMetrics(ctx context.Context, node *domain.Node, config *domain.Config) (*domain.Metrics, error) {
 	metrics := &domain.Metrics{}
 
-	if config.IsMetricEnabled(domain.MetricConnectivity) {
-		metrics.Connectivity = c.checkConnectivity(ctx, node)
-	}
+	// Always check connectivity first (required for SSH)
+	metrics.Connectivity = c.checkConnectivity(ctx, node)
 
 	if !metrics.Connectivity {
 		return metrics, nil
