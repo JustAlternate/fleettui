@@ -8,7 +8,9 @@ A TUI for monitoring your server fleet in real-time. Built with Go and the [Char
 
 - **Real-time Monitoring**: Track CPU, RAM, network usage, uptime, and systemd status
 - **Cards**: Each node displayed in a detailed card with progress bars and status indicators
+- **List View**: Compact tabular view for monitoring many nodes at once
 - **Parallel Collection**: Fetches metrics from all hosts concurrently using goroutines
+- **Long-lived SSH Connections**: Reuses SSH connections for efficient metrics collection
 - **Configurable**: Enable/disable specific metrics via YAML configuration
 
 ## Installation
