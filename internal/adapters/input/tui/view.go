@@ -3,7 +3,6 @@ package tui
 import (
 	"fmt"
 	"strings"
-	"time"
 
 	"fleettui/internal/domain"
 	"github.com/charmbracelet/lipgloss"
@@ -21,12 +20,28 @@ func (m *Model) renderView() string {
 	header := lipgloss.JoinHorizontal(lipgloss.Top, title, stats)
 	sections = append(sections, HeaderStyle.Render(header))
 
-	sections = append(sections, m.viewport.View())
+	switch m.viewMode {
+	case ViewTable:
+		sections = append(sections, m.renderTableHeader())
+		sections = append(sections, m.tableViewport.View())
+	default:
+		sections = append(sections, m.viewport.View())
+	}
 
-	help := HelpStyle.Render("[q] Quit • [r] Refresh • [j/k] Scroll")
+	help := HelpStyle.Render(m.renderHelp())
 	sections = append(sections, help)
 
 	return lipgloss.JoinVertical(lipgloss.Left, sections...)
+}
+
+func (m *Model) renderHelp() string {
+	base := "[q] Quit • [r] Refresh • [tab] Switch view"
+	switch m.viewMode {
+	case ViewTable:
+		return base + " • [j/k] Navigate • [g/G] Top/Bottom"
+	default:
+		return base + " • [j/k] Scroll • [g/G] Top/Bottom"
+	}
 }
 
 func (m *Model) renderCardsContent() string {
@@ -75,19 +90,8 @@ func (m *Model) renderStats() string {
 	}
 
 	healthyStyled := StatsHealthyStyle.Render(healthyStr)
-	intervalStr := fmt.Sprintf("%ds", m.config.RefreshRate/time.Second)
-	intervalStyled := StatsLabelStyle.Render(intervalStr)
 
-	if offline > 0 {
-		offlineStyled := CriticalStyle.Render(fmt.Sprintf("%d offline", offline))
-		return fmt.Sprintf(" %s %s %s %s %s ", separator, healthyStyled, separator, offlineStyled, intervalStyled)
-	}
-
-	return fmt.Sprintf(" %s %s %s ", separator, healthyStyled, intervalStyled)
-}
-
-func (m *Model) renderCards() string {
-	return m.renderCardsContent()
+	return fmt.Sprintf("%s %s ", separator, healthyStyled)
 }
 
 func (m *Model) renderNodeCard(node *domain.Node) string {
@@ -106,7 +110,7 @@ func (m *Model) renderNodeCard(node *domain.Node) string {
 	lines = append(lines, m.renderRow("IP:", node.IP))
 
 	if node.IsPending() {
-		lines = append(lines, m.renderRow("Status:", PendingStyle.Render("Connecting...")))
+		lines = append(lines, m.renderRow("Status:", PendingStyle.Render("Pending...")))
 	} else if !node.IsAvailable() {
 		if node.Error != "" {
 			lines = append(lines, m.renderRow("Status:", CriticalStyle.Render("Error")))
@@ -214,4 +218,179 @@ func truncateString(s string, maxLen int) string {
 		return s
 	}
 	return s[:maxLen-3] + "..."
+}
+
+// ---------------------------------------------------------------------------
+// Table view
+// ---------------------------------------------------------------------------
+
+// tableCell renders a plain fixed-width cell with muted foreground.
+// Used only for the pinned header row (no background concern there).
+func tableCell(s string, width int) string {
+	return lipgloss.NewStyle().Width(width).MaxWidth(width).Render(truncateString(s, width))
+}
+
+// renderCell composes a cell of exactly `width` visible characters.
+// The value string may already contain ANSI escape codes (pre-styled).
+// Any trailing padding spaces are emitted with the row background so there
+// are no "gaps" in the highlight band.
+func renderCell(styledValue string, width int, bg lipgloss.Style) string {
+	visible := lipgloss.Width(styledValue)
+	if visible >= width {
+		return styledValue
+	}
+	pad := bg.Render(strings.Repeat(" ", width-visible))
+	return styledValue + pad
+}
+
+// renderTableHeader returns the pinned column-header row for the table view.
+// It is rendered outside the viewport so it stays fixed while rows scroll.
+func (m *Model) renderTableHeader() string {
+	cols := []string{
+		tableCell("NAME", ColWidthName),
+		tableCell("IP", ColWidthIP),
+		tableCell("STATUS", ColWidthStatus),
+	}
+
+	if m.config.IsMetricEnabled(domain.MetricCPU) {
+		cols = append(cols, tableCell("CPU%", ColWidthCPU))
+	}
+	if m.config.IsMetricEnabled(domain.MetricRAM) {
+		cols = append(cols, tableCell("RAM%", ColWidthRAM))
+	}
+	if m.config.IsMetricEnabled(domain.MetricNetwork) {
+		cols = append(cols, tableCell("NET↓ MB/s", ColWidthNetIn))
+		cols = append(cols, tableCell("NET↑ MB/s", ColWidthNetOut))
+	}
+	if m.config.IsMetricEnabled(domain.MetricUptime) {
+		cols = append(cols, tableCell("UPTIME", ColWidthUptime))
+	}
+	if m.config.IsMetricEnabled(domain.MetricSystemd) {
+		cols = append(cols, tableCell("SYSTEMD", ColWidthSystemd))
+	}
+
+	row := lipgloss.JoinHorizontal(lipgloss.Top, cols...)
+	return TableHeaderStyle.Width(m.width - 2).Render(row)
+}
+
+// renderTableContent builds the full scrollable body for the table view
+// and returns it as a string to be set on the tableViewport.
+func (m *Model) renderTableContent() string {
+	if len(m.nodes) == 0 {
+		return "\n  No hosts configured.\n  Add hosts to ~/.config/fleettui/hosts.yaml\n"
+	}
+
+	var rows []string
+	for i, node := range m.nodes {
+		rows = append(rows, m.renderTableRow(node, i, i == m.cursor))
+	}
+
+	return lipgloss.JoinVertical(lipgloss.Left, rows...)
+}
+
+// renderTableRow renders a single node as a table row.
+//
+// Every cell is built with renderCell which explicitly paints padding spaces
+// with the row background style, ensuring no uncoloured gaps appear between
+// columns on the selected row.
+func (m *Model) renderTableRow(node *domain.Node, _ int, selected bool) string {
+	rowStyle := TableRowStyle
+	if selected {
+		rowStyle = TableRowSelectedStyle
+	}
+
+	// bgStyle is a background-only style used to fill inter-column padding so
+	// that the highlight is unbroken across the full row width.
+	bgStyle := lipgloss.NewStyle().Background(rowStyle.GetBackground())
+
+	// colFg returns a foreground+background style for a metric value cell.
+	colFg := func(c lipgloss.Color) lipgloss.Style {
+		return lipgloss.NewStyle().Foreground(c).Background(rowStyle.GetBackground())
+	}
+
+	// -- Fixed cells (always shown) ------------------------------------------
+	nameFg := colFg(ColorPrimary)
+	if selected {
+		nameFg = nameFg.Bold(true)
+	}
+
+	dot := GetAnimatedDot(m.animationFrame, node)
+	statusFg := lipgloss.NewStyle().
+		Foreground(GetStatusStyle(node).GetForeground()).
+		Background(rowStyle.GetBackground())
+	var statusStr string
+	switch {
+	case node.IsPending():
+		statusStr = statusFg.Render(dot + " Pending")
+	case !node.IsAvailable():
+		statusStr = statusFg.Render(dot + " Offline")
+	default:
+		statusStr = statusFg.Render(dot + " Online")
+	}
+
+	line := renderCell(nameFg.Render(truncateString(node.Name, ColWidthName)), ColWidthName, bgStyle) +
+		renderCell(colFg(ColorMuted).Render(truncateString(node.IP, ColWidthIP)), ColWidthIP, bgStyle) +
+		renderCell(statusStr, ColWidthStatus, bgStyle)
+
+	// -- Metric cells (configurable) -----------------------------------------
+	dash := colFg(ColorMuted).Render("—")
+	available := node.IsAvailable()
+
+	if m.config.IsMetricEnabled(domain.MetricCPU) {
+		if available {
+			pct := node.Metrics.CPU.UsagePercent
+			val := colFg(GetGradientColor(pct)).Render(fmt.Sprintf("%.1f%%", pct))
+			line += renderCell(val, ColWidthCPU, bgStyle)
+		} else {
+			line += renderCell(dash, ColWidthCPU, bgStyle)
+		}
+	}
+
+	if m.config.IsMetricEnabled(domain.MetricRAM) {
+		if available {
+			pct := node.Metrics.RAM.UsagePercent
+			val := colFg(GetGradientColor(pct)).Render(fmt.Sprintf("%.1f%%", pct))
+			line += renderCell(val, ColWidthRAM, bgStyle)
+		} else {
+			line += renderCell(dash, ColWidthRAM, bgStyle)
+		}
+	}
+
+	if m.config.IsMetricEnabled(domain.MetricNetwork) {
+		if available {
+			inVal := colFg(ColorSuccess).Render(fmt.Sprintf("%.2f", node.Metrics.Network.InRateMBps))
+			outVal := colFg(ColorAccent).Render(fmt.Sprintf("%.2f", node.Metrics.Network.OutRateMBps))
+			line += renderCell(inVal, ColWidthNetIn, bgStyle)
+			line += renderCell(outVal, ColWidthNetOut, bgStyle)
+		} else {
+			line += renderCell(dash, ColWidthNetIn, bgStyle)
+			line += renderCell(dash, ColWidthNetOut, bgStyle)
+		}
+	}
+
+	if m.config.IsMetricEnabled(domain.MetricUptime) {
+		if available {
+			val := colFg(ColorPrimary).Render(formatDuration(node.Metrics.Uptime))
+			line += renderCell(val, ColWidthUptime, bgStyle)
+		} else {
+			line += renderCell(dash, ColWidthUptime, bgStyle)
+		}
+	}
+
+	if m.config.IsMetricEnabled(domain.MetricSystemd) {
+		if available {
+			var val string
+			if node.HasFailedUnits() {
+				val = colFg(ColorWarning).Render(fmt.Sprintf("%d failed ⚠", node.Metrics.Systemd.FailedCount))
+			} else {
+				val = colFg(ColorSuccess).Render(fmt.Sprintf("OK (%d)", node.Metrics.Systemd.TotalCount))
+			}
+			line += renderCell(val, ColWidthSystemd, bgStyle)
+		} else {
+			line += renderCell(dash, ColWidthSystemd, bgStyle)
+		}
+	}
+
+	// The outer Render fills any remaining terminal width with the background.
+	return rowStyle.Width(m.width - 2).Render(line)
 }

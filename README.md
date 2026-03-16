@@ -106,3 +106,7 @@ mockery --all
 ## License
 
 MIT License.
+
+## Inspiration
+
+Inspired by [k9s](https://k9scli.io/), a terminal UI for Kubernetes clusters.

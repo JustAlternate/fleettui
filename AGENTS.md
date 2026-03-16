@@ -4,6 +4,8 @@
 
 FleetTUI is a terminal UI application for monitoring server fleets in real-time. Built with Go using the Charm stack (Bubble Tea, Lipgloss, Bubbles).
 
+Repects KISS and vim binding
+
 ### Architecture
 
 The project follows clean architecture principles with clear separation of concerns:

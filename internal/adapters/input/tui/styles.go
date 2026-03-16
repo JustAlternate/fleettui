@@ -69,6 +69,36 @@ var (
 
 	ProgressBarEmptyStyle = lipgloss.NewStyle().
 				Foreground(lipgloss.Color("#2A2A2A"))
+
+	// Table view styles
+
+	TableHeaderStyle = lipgloss.NewStyle().
+				Bold(true).
+				Foreground(ColorMuted).
+				BorderBottom(true).
+				BorderStyle(lipgloss.NormalBorder()).
+				BorderForeground(lipgloss.Color("#3C3C3C"))
+
+	TableRowStyle = lipgloss.NewStyle().
+			Foreground(ColorPrimary)
+
+	TableRowSelectedStyle = lipgloss.NewStyle().
+				Foreground(ColorPrimary).
+				Background(lipgloss.Color("#2A2A2A")).
+				Bold(true)
+)
+
+// Column width constants — shared by header and row renderers for exact alignment.
+const (
+	ColWidthName    = 16
+	ColWidthIP      = 18
+	ColWidthStatus  = 12
+	ColWidthCPU     = 8
+	ColWidthRAM     = 8
+	ColWidthNetIn   = 12
+	ColWidthNetOut  = 12
+	ColWidthUptime  = 10
+	ColWidthSystemd = 14
 )
 
 func GetStatusStyle(node *domain.Node) lipgloss.Style {
