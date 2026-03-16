@@ -22,17 +22,20 @@ func NewCollector(client output.SSHClient) output.MetricsCollector {
 func (c *Collector) CollectMetrics(ctx context.Context, node *domain.Node, config *domain.Config) (*domain.Metrics, error) {
 	metrics := &domain.Metrics{}
 
-	// Always check connectivity first (required for SSH)
-	metrics.Connectivity = c.checkConnectivity(ctx, node)
-
-	if !metrics.Connectivity {
-		return metrics, nil
+	// Attempt connection; real command failures should propagate and trigger backoff
+	if err := c.client.Connect(ctx, node); err != nil {
+		return metrics, err
 	}
+
+	metrics.Connectivity = true
+
+	success := false
 
 	if config.IsMetricEnabled(domain.MetricOS) {
 		os, err := c.collectOS(ctx)
 		if err == nil {
 			node.OSInfo = os
+			success = true
 		}
 	}
 
@@ -40,6 +43,7 @@ func (c *Collector) CollectMetrics(ctx context.Context, node *domain.Node, confi
 		cpu, err := c.collectCPU(ctx)
 		if err == nil {
 			metrics.CPU = cpu
+			success = true
 		}
 	}
 
@@ -47,6 +51,7 @@ func (c *Collector) CollectMetrics(ctx context.Context, node *domain.Node, confi
 		ram, err := c.collectRAM(ctx)
 		if err == nil {
 			metrics.RAM = ram
+			success = true
 		}
 	}
 
@@ -54,6 +59,7 @@ func (c *Collector) CollectMetrics(ctx context.Context, node *domain.Node, confi
 		net, err := c.collectNetwork(ctx, node)
 		if err == nil {
 			metrics.Network = net
+			success = true
 		}
 	}
 
@@ -61,6 +67,7 @@ func (c *Collector) CollectMetrics(ctx context.Context, node *domain.Node, confi
 		uptime, err := c.collectUptime(ctx)
 		if err == nil {
 			metrics.Uptime = uptime
+			success = true
 		}
 	}
 
@@ -68,7 +75,13 @@ func (c *Collector) CollectMetrics(ctx context.Context, node *domain.Node, confi
 		systemd, err := c.collectSystemd(ctx)
 		if err == nil {
 			metrics.Systemd = systemd
+			success = true
 		}
+	}
+
+	if !success {
+		metrics.Connectivity = false
+		return metrics, fmt.Errorf("failed to collect any SSH metrics")
 	}
 
 	return metrics, nil
@@ -80,15 +93,6 @@ func (c *Collector) collectOS(ctx context.Context) (string, error) {
 		return "", err
 	}
 	return strings.TrimSpace(output), nil
-}
-
-func (c *Collector) checkConnectivity(ctx context.Context, node *domain.Node) bool {
-	err := c.client.Connect(ctx, node)
-	if err != nil {
-		return false
-	}
-	_, err = c.client.ExecuteCommand(ctx, "echo 'ping'")
-	return err == nil
 }
 
 func (c *Collector) collectCPU(ctx context.Context) (domain.CPUMetrics, error) {
@@ -136,24 +140,27 @@ func (c *Collector) collectRAM(ctx context.Context) (domain.RAMMetrics, error) {
 }
 
 func (c *Collector) collectNetwork(ctx context.Context, node *domain.Node) (domain.NetworkMetrics, error) {
-	client := c.client.(*Client)
+	client, ok := c.client.(*Client)
+	if !ok {
+		return domain.NetworkMetrics{}, fmt.Errorf("ssh collector requires *Client, got %T", c.client)
+	}
 
-	output, err := c.client.ExecuteCommand(ctx, "cat /proc/net/dev | grep -E '^(\\s*\\w+):' | awk '{print $1, $2, $10}' | head -1")
+	output, err := client.ExecuteCommand(ctx, "INTF=$(ip route show default | awk '{print $5}'); grep \"$INTF\" /proc/net/dev | awk '{print $2, $10}'")
 	if err != nil {
 		return domain.NetworkMetrics{}, err
 	}
 
 	parts := strings.Fields(strings.TrimSpace(output))
-	if len(parts) != 3 {
-		return domain.NetworkMetrics{}, fmt.Errorf("unexpected output format")
+	if len(parts) != 2 {
+		return domain.NetworkMetrics{}, fmt.Errorf("unexpected output format: %s", output)
 	}
 
-	rxBytes, err := strconv.ParseUint(parts[1], 10, 64)
+	rxBytes, err := strconv.ParseUint(parts[0], 10, 64)
 	if err != nil {
 		return domain.NetworkMetrics{}, err
 	}
 
-	txBytes, err := strconv.ParseUint(parts[2], 10, 64)
+	txBytes, err := strconv.ParseUint(parts[1], 10, 64)
 	if err != nil {
 		return domain.NetworkMetrics{}, err
 	}

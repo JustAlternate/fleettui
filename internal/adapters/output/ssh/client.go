@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"sync"
 	"time"
 
 	"fleettui/internal/domain"
@@ -12,10 +13,17 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
+const (
+	keepaliveInterval = 5 * time.Second
+	keepaliveMaxMiss  = 3
+)
+
 type Client struct {
-	client  *ssh.Client
-	node    *domain.Node
-	lastNet *netStats
+	mu            sync.Mutex
+	client        *ssh.Client
+	node          *domain.Node
+	lastNet       *netStats
+	stopKeepalive chan struct{}
 }
 
 type netStats struct {
@@ -29,6 +37,14 @@ func NewClient() output.SSHClient {
 }
 
 func (c *Client) Connect(ctx context.Context, node *domain.Node) error {
+	// Already connected — reuse the existing session.
+	c.mu.Lock()
+	if c.client != nil {
+		c.mu.Unlock()
+		return nil
+	}
+	c.mu.Unlock()
+
 	key, err := os.ReadFile(node.SSHKeyPath)
 	if err != nil {
 		return fmt.Errorf("failed to read SSH key: %w", err)
@@ -63,26 +79,92 @@ func (c *Client) Connect(ctx context.Context, node *domain.Node) error {
 	// Create SSH connection over the TCP connection
 	sshConn, chans, reqs, err := ssh.NewClientConn(conn, addr, config)
 	if err != nil {
-		conn.Close()
+		_ = conn.Close()
 		return fmt.Errorf("failed to establish SSH connection to %s: %w", node.IP, err)
 	}
 
 	client := ssh.NewClient(sshConn, chans, reqs)
 
+	c.mu.Lock()
 	c.client = client
 	c.node = node
+
+	// Start SSH-level keepalives. The Go x/crypto/ssh package has no built-in
+	// ServerAliveInterval so we send "keepalive@golang.org" global requests
+	// on a ticker. After keepaliveMaxMiss consecutive failures the underlying
+	// connection is forcibly closed, causing any in-flight commands to fail
+	// immediately rather than blocking until the idle timeout.
+	c.stopKeepalive = make(chan struct{})
+	stopCh := c.stopKeepalive
+	c.mu.Unlock()
+
+	go c.runKeepalive(stopCh)
+
 	return nil
 }
 
 func (c *Client) Disconnect() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.stopKeepalive != nil {
+		close(c.stopKeepalive)
+		c.stopKeepalive = nil
+	}
 	if c.client != nil {
-		return c.client.Close()
+		err := c.client.Close()
+		c.client = nil
+		return err
 	}
 	return nil
 }
 
+// runKeepalive sends SSH-layer keepalive requests every keepaliveInterval.
+// After keepaliveMaxMiss consecutive missed replies the connection is closed,
+// allowing the pool to detect the dead link within ~15 seconds.
+func (c *Client) runKeepalive(stop <-chan struct{}) {
+	ticker := time.NewTicker(keepaliveInterval)
+	defer ticker.Stop()
+
+	missed := 0
+	for {
+		select {
+		case <-stop:
+			return
+		case <-ticker.C:
+			c.mu.Lock()
+			client := c.client
+			c.mu.Unlock()
+
+			if client == nil {
+				return
+			}
+
+			_, _, err := client.SendRequest("keepalive@golang.org", true, nil)
+			if err != nil {
+				missed++
+				if missed >= keepaliveMaxMiss {
+					c.mu.Lock()
+					if c.client != nil {
+						_ = c.client.Close()
+						c.client = nil
+					}
+					c.mu.Unlock()
+					return
+				}
+			} else {
+				missed = 0
+			}
+		}
+	}
+}
+
 func (c *Client) ExecuteCommand(ctx context.Context, command string) (string, error) {
-	if c.client == nil {
+	c.mu.Lock()
+	client := c.client
+	c.mu.Unlock()
+
+	if client == nil {
 		return "", fmt.Errorf("not connected")
 	}
 
@@ -93,11 +175,11 @@ func (c *Client) ExecuteCommand(ctx context.Context, command string) (string, er
 	default:
 	}
 
-	session, err := c.client.NewSession()
+	session, err := client.NewSession()
 	if err != nil {
 		return "", fmt.Errorf("failed to create session: %w", err)
 	}
-	defer session.Close()
+	defer func() { _ = session.Close() }()
 
 	// Execute command with context awareness
 	outputCh := make(chan []byte, 1)
@@ -114,7 +196,7 @@ func (c *Client) ExecuteCommand(ctx context.Context, command string) (string, er
 
 	select {
 	case <-ctx.Done():
-		session.Signal(ssh.SIGTERM)
+		_ = session.Signal(ssh.SIGTERM)
 		return "", ctx.Err()
 	case err := <-errCh:
 		return "", fmt.Errorf("command failed: %w", err)
@@ -124,6 +206,8 @@ func (c *Client) ExecuteCommand(ctx context.Context, command string) (string, er
 }
 
 func (c *Client) IsConnected() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	return c.client != nil
 }
 

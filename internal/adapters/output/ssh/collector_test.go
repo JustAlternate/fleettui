@@ -452,33 +452,20 @@ func TestCollector_CollectOS(t *testing.T) {
 	}
 }
 
-func TestCollector_CheckConnectivity(t *testing.T) {
+func TestCollector_Connectivity_ViaDirect_Connect(t *testing.T) {
 	tests := []struct {
 		name       string
 		connectErr error
-		pingOutput string
-		pingErr    error
 		want       bool
 	}{
 		{
-			name:       "connected when connect succeeds and ping succeeds",
+			name:       "connected when connect succeeds",
 			connectErr: nil,
-			pingOutput: "ping",
-			pingErr:    nil,
 			want:       true,
 		},
 		{
 			name:       "not connected when connect fails",
 			connectErr: errors.New("connection refused"),
-			pingOutput: "",
-			pingErr:    nil,
-			want:       false,
-		},
-		{
-			name:       "not connected when ping fails",
-			connectErr: nil,
-			pingOutput: "",
-			pingErr:    errors.New("command failed"),
 			want:       false,
 		},
 	}
@@ -487,14 +474,21 @@ func TestCollector_CheckConnectivity(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mockClient := new(mocks.MockSSHClient)
 			mockClient.On("Connect", mock.Anything, mock.Anything).Return(tt.connectErr)
-			mockClient.On("ExecuteCommand", mock.Anything, "echo 'ping'").Return(tt.pingOutput, tt.pingErr)
 
 			collector := &Collector{client: mockClient}
 			node := &domain.Node{Name: "test", IP: "192.168.1.1"}
-			got := collector.checkConnectivity(context.Background(), node)
+			config := &domain.Config{
+				RefreshRate:    5 * time.Second,
+				EnabledMetrics: []domain.MetricType{},
+			}
 
-			if got != tt.want {
-				t.Errorf("checkConnectivity() = %v, want %v", got, tt.want)
+			metrics, err := collector.CollectMetrics(context.Background(), node, config)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if metrics.Connectivity != tt.want {
+				t.Errorf("Connectivity = %v, want %v", metrics.Connectivity, tt.want)
 			}
 		})
 	}
@@ -525,7 +519,6 @@ func TestCollector_CollectMetrics_Connectivity(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mockClient := new(mocks.MockSSHClient)
 			mockClient.On("Connect", mock.Anything, mock.Anything).Return(tt.connectErr)
-			mockClient.On("ExecuteCommand", mock.Anything, "echo 'ping'").Return("ping", nil)
 
 			collector := &Collector{client: mockClient}
 			config := &domain.Config{

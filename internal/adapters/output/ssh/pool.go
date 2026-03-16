@@ -28,23 +28,31 @@ type BackoffState struct {
 
 // ConnectionPool manages persistent SSH connections per node
 type ConnectionPool struct {
-	connections map[string]*PooledConnection
-	backoffs    map[string]*BackoffState
-	mu          sync.RWMutex
-	idleTimeout time.Duration
-	baseDelay   time.Duration
-	maxDelay    time.Duration
+	connections   map[string]*PooledConnection
+	backoffs      map[string]*BackoffState
+	mu            sync.RWMutex
+	idleTimeout   time.Duration
+	baseDelay     time.Duration
+	maxDelay      time.Duration
+	clientFactory func() output.SSHClient
 }
 
 // NewConnectionPool creates a new connection pool
 func NewConnectionPool() *ConnectionPool {
 	return &ConnectionPool{
-		connections: make(map[string]*PooledConnection),
-		backoffs:    make(map[string]*BackoffState),
-		idleTimeout: 5 * time.Minute,
-		baseDelay:   5 * time.Second,
-		maxDelay:    5 * time.Minute,
+		connections:   make(map[string]*PooledConnection),
+		backoffs:      make(map[string]*BackoffState),
+		idleTimeout:   5 * time.Minute,
+		baseDelay:     5 * time.Second,
+		maxDelay:      5 * time.Minute,
+		clientFactory: NewClient,
 	}
+}
+
+// WithClientFactory overrides the client factory for testing
+func (p *ConnectionPool) WithClientFactory(factory func() output.SSHClient) *ConnectionPool {
+	p.clientFactory = factory
+	return p
 }
 
 // Get retrieves or creates a connection for a node
@@ -71,15 +79,9 @@ func (p *ConnectionPool) Get(ctx context.Context, node *domain.Node) (output.SSH
 	}
 
 	// Create new connection
-	client := NewClient()
+	client := p.clientFactory()
 	if err := client.Connect(ctx, node); err != nil {
 		return nil, err
-	}
-
-	// Test the connection
-	if _, err := client.ExecuteCommand(ctx, "echo 'ping'"); err != nil {
-		client.Disconnect()
-		return nil, fmt.Errorf("connection test failed: %w", err)
 	}
 
 	// Store in pool

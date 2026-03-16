@@ -266,7 +266,7 @@ func (m *Model) renderTableHeader() string {
 		cols = append(cols, tableCell("UPTIME", ColWidthUptime))
 	}
 	if m.config.IsMetricEnabled(domain.MetricSystemd) {
-		cols = append(cols, tableCell("SYSTEMD", ColWidthSystemd))
+		cols = append(cols, tableCell("SYSTEMD UNITS", ColWidthSystemd))
 	}
 
 	row := lipgloss.JoinHorizontal(lipgloss.Top, cols...)
@@ -358,7 +358,7 @@ func (m *Model) renderTableRow(node *domain.Node, _ int, selected bool) string {
 
 	if m.config.IsMetricEnabled(domain.MetricNetwork) {
 		if available {
-			inVal := colFg(ColorSuccess).Render(fmt.Sprintf("%.2f", node.Metrics.Network.InRateMBps))
+			inVal := colFg(ColorAccent).Render(fmt.Sprintf("%.2f", node.Metrics.Network.InRateMBps))
 			outVal := colFg(ColorAccent).Render(fmt.Sprintf("%.2f", node.Metrics.Network.OutRateMBps))
 			line += renderCell(inVal, ColWidthNetIn, bgStyle)
 			line += renderCell(outVal, ColWidthNetOut, bgStyle)
@@ -381,7 +381,7 @@ func (m *Model) renderTableRow(node *domain.Node, _ int, selected bool) string {
 		if available {
 			var val string
 			if node.HasFailedUnits() {
-				val = colFg(ColorWarning).Render(fmt.Sprintf("%d failed ⚠", node.Metrics.Systemd.FailedCount))
+				val = colFg(ColorCritical).Render(fmt.Sprintf("Failed (%d) ⚠", node.Metrics.Systemd.FailedCount))
 			} else {
 				val = colFg(ColorSuccess).Render(fmt.Sprintf("OK (%d)", node.Metrics.Systemd.TotalCount))
 			}

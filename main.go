@@ -83,8 +83,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	collectorFactory := func(node *domain.Node) output.MetricsCollector {
-		client := ssh.NewClient()
+	collectorFactory := func(client output.SSHClient) output.MetricsCollector {
 		return ssh.NewCollector(client)
 	}
 
