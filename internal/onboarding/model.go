@@ -436,19 +436,6 @@ func (m *Model) handleTab() (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m *Model) handleKey(key string) (tea.Model, tea.Cmd) {
-	if m.step == stepAddMoreNodes {
-		switch key {
-		case "y", "Y":
-			m.step = stepNodeName
-			m.nameInput.Focus()
-		case "n", "N":
-			m.step = stepSelectMetrics
-		}
-	}
-	return m, nil
-}
-
 func (m *Model) getAllMetrics() []domain.MetricType {
 	return []domain.MetricType{
 		domain.MetricCPU,

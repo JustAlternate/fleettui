@@ -114,7 +114,7 @@ func (mc *MetricsCollector) Start(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			mc.pool.CloseAll()
+			_ = mc.pool.CloseAll()
 			return
 		case <-ticker.C:
 			mc.CollectAll(ctx)

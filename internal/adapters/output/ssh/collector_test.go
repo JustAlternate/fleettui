@@ -475,16 +475,27 @@ func TestCollector_Connectivity_ViaDirect_Connect(t *testing.T) {
 			mockClient := new(mocks.MockSSHClient)
 			mockClient.On("Connect", mock.Anything, mock.Anything).Return(tt.connectErr)
 
+			if tt.connectErr == nil {
+				mockClient.On("ExecuteCommand", mock.Anything, mock.Anything).Return("Ubuntu 22.04", nil)
+			}
+
 			collector := &Collector{client: mockClient}
 			node := &domain.Node{Name: "test", IP: "192.168.1.1"}
 			config := &domain.Config{
 				RefreshRate:    5 * time.Second,
-				EnabledMetrics: []domain.MetricType{},
+				EnabledMetrics: []domain.MetricType{domain.MetricOS},
 			}
 
 			metrics, err := collector.CollectMetrics(context.Background(), node, config)
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
+
+			if tt.connectErr != nil {
+				if err == nil {
+					t.Fatalf("expected error, got nil")
+				}
+			} else {
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
 			}
 
 			if metrics.Connectivity != tt.want {
@@ -511,7 +522,7 @@ func TestCollector_CollectMetrics_Connectivity(t *testing.T) {
 			name:       "returns metrics without connectivity when disconnected",
 			connectErr: errors.New("connection failed"),
 			wantConn:   false,
-			wantErr:    false,
+			wantErr:    true,
 		},
 	}
 
@@ -520,10 +531,14 @@ func TestCollector_CollectMetrics_Connectivity(t *testing.T) {
 			mockClient := new(mocks.MockSSHClient)
 			mockClient.On("Connect", mock.Anything, mock.Anything).Return(tt.connectErr)
 
+			if tt.connectErr == nil {
+				mockClient.On("ExecuteCommand", mock.Anything, mock.Anything).Return("Ubuntu 22.04", nil)
+			}
+
 			collector := &Collector{client: mockClient}
 			config := &domain.Config{
 				RefreshRate:    5 * time.Second,
-				EnabledMetrics: []domain.MetricType{}, // Disable all optional metrics
+				EnabledMetrics: []domain.MetricType{domain.MetricOS},
 			}
 			node := &domain.Node{Name: "test", IP: "192.168.1.1"}
 

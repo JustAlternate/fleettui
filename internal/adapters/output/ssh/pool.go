@@ -74,7 +74,7 @@ func (p *ConnectionPool) Get(ctx context.Context, node *domain.Node) (output.SSH
 			return conn.client, nil
 		}
 		// Connection is stale or unhealthy, close it
-		conn.client.Disconnect()
+		_ = conn.client.Disconnect()
 		delete(p.connections, node.IP)
 	}
 
@@ -131,7 +131,7 @@ func (p *ConnectionPool) RecordFailure(nodeIP string) {
 
 	// Remove failed connection from pool
 	if conn, exists := p.connections[nodeIP]; exists {
-		conn.client.Disconnect()
+		_ = conn.client.Disconnect()
 		delete(p.connections, nodeIP)
 	}
 }
@@ -183,7 +183,7 @@ func (p *ConnectionPool) CleanupIdle() {
 	now := time.Now()
 	for ip, conn := range p.connections {
 		if now.Sub(conn.lastUsed) > p.idleTimeout {
-			conn.client.Disconnect()
+			_ = conn.client.Disconnect()
 			delete(p.connections, ip)
 		}
 	}
