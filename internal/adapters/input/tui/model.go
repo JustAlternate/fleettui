@@ -9,6 +9,18 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
+// ViewMode represents which view is currently active in the TUI.
+type ViewMode int
+
+const (
+	// ViewCards is the default card-grid view.
+	ViewCards ViewMode = iota
+	// ViewTable is the dense list/table view.
+	ViewTable
+	// ViewDetail is reserved for a future per-node detail panel.
+	// ViewDetail
+)
+
 type Model struct {
 	nodes          []*domain.Node
 	config         *domain.Config
@@ -20,21 +32,30 @@ type Model struct {
 	animationFrame int
 	lastRefresh    int64
 	viewport       viewport.Model
-	ready          bool
+	tableViewport  viewport.Model // separate viewport so each view remembers its scroll position
+	viewMode       ViewMode
+	cursor         int // selected row index in table view
+	countPrefix    int // vim-style numeric motion multiplier (e.g. 9 in "9j")
 }
 
 // NewModel creates a new TUI model
 func NewModel(nodes []*domain.Node, config *domain.Config, collector *service.MetricsCollector) *Model {
 	ctx, cancel := context.WithCancel(context.Background())
+
 	vp := viewport.New(100, 20)
 	vp.SetContent("Loading...")
+
+	tvp := viewport.New(100, 20)
+	tvp.SetContent("Loading...")
+
 	return &Model{
-		nodes:     nodes,
-		config:    config,
-		collector: collector,
-		ctx:       ctx,
-		cancel:    cancel,
-		viewport:  vp,
+		nodes:         nodes,
+		config:        config,
+		collector:     collector,
+		ctx:           ctx,
+		cancel:        cancel,
+		viewport:      vp,
+		tableViewport: tvp,
 	}
 }
 
