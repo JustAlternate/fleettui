@@ -70,7 +70,9 @@ for i in $(seq 1 25); do
             --cpus="0.5" \
             --memory="256m" \
             $IMAGE_NAME
-        REACHABLE_NODES+=("node-$i:$port")
+        if [ "$role" != "offline-broken" ]; then
+            REACHABLE_NODES+=("node-$i:$port")
+        fi
         echo "Created node-$i on port $port (role: $role)"
     fi
 done

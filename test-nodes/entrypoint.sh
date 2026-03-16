@@ -6,13 +6,13 @@ ROLE="${NODE_ROLE:-normal}"
 setup_systemctl_wrapper() {
     cat > /usr/local/bin/systemctl << 'WRAPPER'
 #!/bin/bash
-case "$1" in
-    --failed|--failed\ --no-legend)
+case "$*" in
+    --failed*)
         echo "test-fail-1.service   loaded failed failed"
         echo "test-fail-2.service   loaded failed failed" 
         exit 0
         ;;
-    list-units|--type=service|--type=service\ --no-legend)
+    list-units*|--type=service*)
         echo "ssh.service     loaded active running OpenBSD Secure Shell server"
         echo "test-fail-1.service   loaded failed failed"
         echo "test-fail-2.service   loaded failed failed"
@@ -20,7 +20,7 @@ case "$1" in
         exit 0
         ;;
     *)
-        /bin/systemctl.real "$@"
+        /usr/bin/systemctl.real "$@"
         ;;
 esac
 WRAPPER

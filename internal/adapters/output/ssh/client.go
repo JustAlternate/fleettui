@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"sync"
 	"time"
 
 	"fleettui/internal/domain"
@@ -18,6 +19,7 @@ const (
 )
 
 type Client struct {
+	mu            sync.Mutex
 	client        *ssh.Client
 	node          *domain.Node
 	lastNet       *netStats
@@ -36,9 +38,12 @@ func NewClient() output.SSHClient {
 
 func (c *Client) Connect(ctx context.Context, node *domain.Node) error {
 	// Already connected — reuse the existing session.
+	c.mu.Lock()
 	if c.client != nil {
+		c.mu.Unlock()
 		return nil
 	}
+	c.mu.Unlock()
 
 	key, err := os.ReadFile(node.SSHKeyPath)
 	if err != nil {
@@ -74,12 +79,13 @@ func (c *Client) Connect(ctx context.Context, node *domain.Node) error {
 	// Create SSH connection over the TCP connection
 	sshConn, chans, reqs, err := ssh.NewClientConn(conn, addr, config)
 	if err != nil {
-		conn.Close()
+		_ = conn.Close()
 		return fmt.Errorf("failed to establish SSH connection to %s: %w", node.IP, err)
 	}
 
 	client := ssh.NewClient(sshConn, chans, reqs)
 
+	c.mu.Lock()
 	c.client = client
 	c.node = node
 
@@ -89,12 +95,18 @@ func (c *Client) Connect(ctx context.Context, node *domain.Node) error {
 	// connection is forcibly closed, causing any in-flight commands to fail
 	// immediately rather than blocking until the idle timeout.
 	c.stopKeepalive = make(chan struct{})
-	go c.runKeepalive(c.stopKeepalive)
+	stopCh := c.stopKeepalive
+	c.mu.Unlock()
+
+	go c.runKeepalive(stopCh)
 
 	return nil
 }
 
 func (c *Client) Disconnect() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	if c.stopKeepalive != nil {
 		close(c.stopKeepalive)
 		c.stopKeepalive = nil
@@ -120,12 +132,24 @@ func (c *Client) runKeepalive(stop <-chan struct{}) {
 		case <-stop:
 			return
 		case <-ticker.C:
-			_, _, err := c.client.SendRequest("keepalive@golang.org", true, nil)
+			c.mu.Lock()
+			client := c.client
+			c.mu.Unlock()
+
+			if client == nil {
+				return
+			}
+
+			_, _, err := client.SendRequest("keepalive@golang.org", true, nil)
 			if err != nil {
 				missed++
 				if missed >= keepaliveMaxMiss {
-					_ = c.client.Close()
-					c.client = nil
+					c.mu.Lock()
+					if c.client != nil {
+						_ = c.client.Close()
+						c.client = nil
+					}
+					c.mu.Unlock()
 					return
 				}
 			} else {
@@ -136,7 +160,11 @@ func (c *Client) runKeepalive(stop <-chan struct{}) {
 }
 
 func (c *Client) ExecuteCommand(ctx context.Context, command string) (string, error) {
-	if c.client == nil {
+	c.mu.Lock()
+	client := c.client
+	c.mu.Unlock()
+
+	if client == nil {
 		return "", fmt.Errorf("not connected")
 	}
 
@@ -147,11 +175,11 @@ func (c *Client) ExecuteCommand(ctx context.Context, command string) (string, er
 	default:
 	}
 
-	session, err := c.client.NewSession()
+	session, err := client.NewSession()
 	if err != nil {
 		return "", fmt.Errorf("failed to create session: %w", err)
 	}
-	defer session.Close()
+	defer func() { _ = session.Close() }()
 
 	// Execute command with context awareness
 	outputCh := make(chan []byte, 1)
@@ -168,7 +196,7 @@ func (c *Client) ExecuteCommand(ctx context.Context, command string) (string, er
 
 	select {
 	case <-ctx.Done():
-		session.Signal(ssh.SIGTERM)
+		_ = session.Signal(ssh.SIGTERM)
 		return "", ctx.Err()
 	case err := <-errCh:
 		return "", fmt.Errorf("command failed: %w", err)
@@ -178,6 +206,8 @@ func (c *Client) ExecuteCommand(ctx context.Context, command string) (string, er
 }
 
 func (c *Client) IsConnected() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	return c.client != nil
 }
 
