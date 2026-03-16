@@ -21,17 +21,17 @@
         packages = {
           default = pkgs.buildGoModule {
             pname = "fleettui";
-            version = "0.1.0";
+            version = "1.0.0";
 
             src = ./.;
 
-            vendorHash = "sha256-GgS3itX4+/GsdP2dCZCYtMqql9lY/kddicYVQQ+NcoE=";
+            vendorHash = "sha256-0wBJ09LVFROF1sW95QJh2jPV34htZ9PnKcMpc/opJPs=";
 
             meta = with pkgs.lib; {
               description = "A TUI for managing and monitoring server fleets";
               homepage = "https://github.com/JustAlternate/fleettui";
               license = licenses.mit;
-              maintainers = [ ];
+              maintainers = [ "loicw@justalternate.com" ];
             };
           };
         };
@@ -40,17 +40,6 @@
           default = {
             type = "app";
             program = "${self.packages.${system}.default}/bin/fleettui";
-          };
-        };
-
-        devShells = {
-          default = pkgs.mkShell {
-            packages = with pkgs; [
-              go
-              gopls
-              gotools
-              go-tools
-            ];
           };
         };
       }
