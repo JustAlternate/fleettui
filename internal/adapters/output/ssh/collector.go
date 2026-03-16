@@ -22,12 +22,12 @@ func NewCollector(client output.SSHClient) output.MetricsCollector {
 func (c *Collector) CollectMetrics(ctx context.Context, node *domain.Node, config *domain.Config) (*domain.Metrics, error) {
 	metrics := &domain.Metrics{}
 
-	// Always check connectivity first (required for SSH)
-	metrics.Connectivity = c.checkConnectivity(ctx, node)
-
-	if !metrics.Connectivity {
+	// Attempt connection; real command failures will propagate and trigger backoff
+	if err := c.client.Connect(ctx, node); err != nil {
 		return metrics, nil
 	}
+
+	metrics.Connectivity = true
 
 	if config.IsMetricEnabled(domain.MetricOS) {
 		os, err := c.collectOS(ctx)
@@ -82,15 +82,6 @@ func (c *Collector) collectOS(ctx context.Context) (string, error) {
 	return strings.TrimSpace(output), nil
 }
 
-func (c *Collector) checkConnectivity(ctx context.Context, node *domain.Node) bool {
-	err := c.client.Connect(ctx, node)
-	if err != nil {
-		return false
-	}
-	_, err = c.client.ExecuteCommand(ctx, "echo 'ping'")
-	return err == nil
-}
-
 func (c *Collector) collectCPU(ctx context.Context) (domain.CPUMetrics, error) {
 	output, err := c.client.ExecuteCommand(ctx, "top -bn1 | grep 'Cpu(s)' | awk '{print $2}' | cut -d'%' -f1")
 	if err != nil {
@@ -138,22 +129,22 @@ func (c *Collector) collectRAM(ctx context.Context) (domain.RAMMetrics, error) {
 func (c *Collector) collectNetwork(ctx context.Context, node *domain.Node) (domain.NetworkMetrics, error) {
 	client := c.client.(*Client)
 
-	output, err := c.client.ExecuteCommand(ctx, "cat /proc/net/dev | grep -E '^(\\s*\\w+):' | awk '{print $1, $2, $10}' | head -1")
+	output, err := c.client.ExecuteCommand(ctx, "INTF=$(ip route show default | awk '{print $5}'); grep \"$INTF\" /proc/net/dev | awk '{print $2, $10}'")
 	if err != nil {
 		return domain.NetworkMetrics{}, err
 	}
 
 	parts := strings.Fields(strings.TrimSpace(output))
-	if len(parts) != 3 {
-		return domain.NetworkMetrics{}, fmt.Errorf("unexpected output format")
+	if len(parts) != 2 {
+		return domain.NetworkMetrics{}, fmt.Errorf("unexpected output format: %s", output)
 	}
 
-	rxBytes, err := strconv.ParseUint(parts[1], 10, 64)
+	rxBytes, err := strconv.ParseUint(parts[0], 10, 64)
 	if err != nil {
 		return domain.NetworkMetrics{}, err
 	}
 
-	txBytes, err := strconv.ParseUint(parts[2], 10, 64)
+	txBytes, err := strconv.ParseUint(parts[1], 10, 64)
 	if err != nil {
 		return domain.NetworkMetrics{}, err
 	}

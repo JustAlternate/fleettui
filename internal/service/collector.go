@@ -10,8 +10,8 @@ import (
 	"fleettui/internal/ports/output"
 )
 
-// CollectorFactory creates a MetricsCollector for a specific node
-type CollectorFactory func(node *domain.Node) output.MetricsCollector
+// CollectorFactory creates a MetricsCollector using the provided SSHClient
+type CollectorFactory func(client output.SSHClient) output.MetricsCollector
 
 type MetricsCollector struct {
 	config           *domain.Config
@@ -66,7 +66,17 @@ func (mc *MetricsCollector) collectNode(ctx context.Context, node *domain.Node) 
 		return
 	}
 
-	collector = mc.collectorFactory(node)
+	client, err := mc.pool.Get(ctx, node)
+	if err != nil {
+		mc.pool.RecordFailure(node.IP)
+		node.Error = err.Error()
+		node.Metrics.Connectivity = false
+		node.LastUpdated = time.Now()
+		return
+	}
+	defer mc.pool.Return(node.IP)
+
+	collector = mc.collectorFactory(client)
 
 	metrics, err := collector.CollectMetrics(ctx, node, mc.config)
 	if err != nil {

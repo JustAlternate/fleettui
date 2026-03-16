@@ -12,10 +12,16 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
+const (
+	keepaliveInterval = 5 * time.Second
+	keepaliveMaxMiss  = 3
+)
+
 type Client struct {
-	client  *ssh.Client
-	node    *domain.Node
-	lastNet *netStats
+	client        *ssh.Client
+	node          *domain.Node
+	lastNet       *netStats
+	stopKeepalive chan struct{}
 }
 
 type netStats struct {
@@ -29,6 +35,11 @@ func NewClient() output.SSHClient {
 }
 
 func (c *Client) Connect(ctx context.Context, node *domain.Node) error {
+	// Already connected — reuse the existing session.
+	if c.client != nil {
+		return nil
+	}
+
 	key, err := os.ReadFile(node.SSHKeyPath)
 	if err != nil {
 		return fmt.Errorf("failed to read SSH key: %w", err)
@@ -71,14 +82,57 @@ func (c *Client) Connect(ctx context.Context, node *domain.Node) error {
 
 	c.client = client
 	c.node = node
+
+	// Start SSH-level keepalives. The Go x/crypto/ssh package has no built-in
+	// ServerAliveInterval so we send "keepalive@golang.org" global requests
+	// on a ticker. After keepaliveMaxMiss consecutive failures the underlying
+	// connection is forcibly closed, causing any in-flight commands to fail
+	// immediately rather than blocking until the idle timeout.
+	c.stopKeepalive = make(chan struct{})
+	go c.runKeepalive(c.stopKeepalive)
+
 	return nil
 }
 
 func (c *Client) Disconnect() error {
+	if c.stopKeepalive != nil {
+		close(c.stopKeepalive)
+		c.stopKeepalive = nil
+	}
 	if c.client != nil {
-		return c.client.Close()
+		err := c.client.Close()
+		c.client = nil
+		return err
 	}
 	return nil
+}
+
+// runKeepalive sends SSH-layer keepalive requests every keepaliveInterval.
+// After keepaliveMaxMiss consecutive missed replies the connection is closed,
+// allowing the pool to detect the dead link within ~15 seconds.
+func (c *Client) runKeepalive(stop <-chan struct{}) {
+	ticker := time.NewTicker(keepaliveInterval)
+	defer ticker.Stop()
+
+	missed := 0
+	for {
+		select {
+		case <-stop:
+			return
+		case <-ticker.C:
+			_, _, err := c.client.SendRequest("keepalive@golang.org", true, nil)
+			if err != nil {
+				missed++
+				if missed >= keepaliveMaxMiss {
+					_ = c.client.Close()
+					c.client = nil
+					return
+				}
+			} else {
+				missed = 0
+			}
+		}
+	}
 }
 
 func (c *Client) ExecuteCommand(ctx context.Context, command string) (string, error) {

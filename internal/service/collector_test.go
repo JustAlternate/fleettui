@@ -169,11 +169,11 @@ func TestMetricsCollector_CollectAll_Success(t *testing.T) {
 	}
 
 	// Create mock collector factory that returns a mock for each node
-	mockFactory := func(node *domain.Node) output.MetricsCollector {
+	mockFactory := func(client output.SSHClient) output.MetricsCollector {
 		mockCollector := new(mocks.MockMetricsCollector)
 		mockCollector.On("CollectMetrics",
 			mock.Anything,
-			node,
+			mock.Anything,
 			mock.Anything,
 		).Return(&domain.Metrics{
 			Connectivity: true,
@@ -187,6 +187,14 @@ func TestMetricsCollector_CollectAll_Success(t *testing.T) {
 		nodes,
 		mockFactory,
 	)
+
+	mockClientFactory := func() output.SSHClient {
+		mockClient := new(mocks.MockSSHClient)
+		mockClient.On("Connect", mock.Anything, mock.Anything).Return(nil)
+		mockClient.On("Disconnect").Return(nil)
+		return mockClient
+	}
+	mc.pool.WithClientFactory(mockClientFactory)
 
 	ctx := context.Background()
 	mc.CollectAll(ctx)
@@ -212,11 +220,11 @@ func TestMetricsCollector_CollectAll_WithErrors(t *testing.T) {
 
 	testError := errors.New("connection failed")
 
-	mockFactory := func(node *domain.Node) output.MetricsCollector {
+	mockFactory := func(client output.SSHClient) output.MetricsCollector {
 		mockCollector := new(mocks.MockMetricsCollector)
 		mockCollector.On("CollectMetrics",
 			mock.Anything,
-			node,
+			mock.Anything,
 			mock.Anything,
 		).Return(nil, testError)
 		return mockCollector
@@ -227,6 +235,14 @@ func TestMetricsCollector_CollectAll_WithErrors(t *testing.T) {
 		nodes,
 		mockFactory,
 	)
+
+	mockClientFactory := func() output.SSHClient {
+		mockClient := new(mocks.MockSSHClient)
+		mockClient.On("Connect", mock.Anything, mock.Anything).Return(nil)
+		mockClient.On("Disconnect").Return(nil)
+		return mockClient
+	}
+	mc.pool.WithClientFactory(mockClientFactory)
 
 	ctx := context.Background()
 	mc.CollectAll(ctx)
@@ -249,6 +265,13 @@ func TestMetricsCollector_CollectAll_NoFactory(t *testing.T) {
 		nodes,
 		nil, // No factory provided
 	)
+	mockClientFactory := func() output.SSHClient {
+		mockClient := new(mocks.MockSSHClient)
+		mockClient.On("Connect", mock.Anything, mock.Anything).Return(nil)
+		mockClient.On("Disconnect").Return(nil)
+		return mockClient
+	}
+	mc.pool.WithClientFactory(mockClientFactory)
 
 	ctx := context.Background()
 	mc.CollectAll(ctx)
@@ -263,7 +286,7 @@ func TestMetricsCollector_CollectAll_NoFactory(t *testing.T) {
 
 func TestMetricsCollector_CollectAll_EmptyNodes(t *testing.T) {
 	callCount := 0
-	mockFactory := func(node *domain.Node) output.MetricsCollector {
+	mockFactory := func(client output.SSHClient) output.MetricsCollector {
 		callCount++
 		return new(mocks.MockMetricsCollector)
 	}
@@ -273,6 +296,13 @@ func TestMetricsCollector_CollectAll_EmptyNodes(t *testing.T) {
 		[]*domain.Node{}, // Empty nodes
 		mockFactory,
 	)
+	mockClientFactory := func() output.SSHClient {
+		mockClient := new(mocks.MockSSHClient)
+		mockClient.On("Connect", mock.Anything, mock.Anything).Return(nil)
+		mockClient.On("Disconnect").Return(nil)
+		return mockClient
+	}
+	mc.pool.WithClientFactory(mockClientFactory)
 
 	ctx := context.Background()
 	mc.CollectAll(ctx)
@@ -333,11 +363,11 @@ func TestMetricsCollector_CollectAll_Concurrent(t *testing.T) {
 		}
 	}
 
-	mockFactory := func(node *domain.Node) output.MetricsCollector {
+	mockFactory := func(client output.SSHClient) output.MetricsCollector {
 		mockCollector := new(mocks.MockMetricsCollector)
 		mockCollector.On("CollectMetrics",
 			mock.Anything,
-			node,
+			mock.Anything,
 			mock.Anything,
 		).Return(&domain.Metrics{Connectivity: true}, nil)
 		return mockCollector
@@ -348,6 +378,14 @@ func TestMetricsCollector_CollectAll_Concurrent(t *testing.T) {
 		nodes,
 		mockFactory,
 	)
+
+	mockClientFactory := func() output.SSHClient {
+		mockClient := new(mocks.MockSSHClient)
+		mockClient.On("Connect", mock.Anything, mock.Anything).Return(nil)
+		mockClient.On("Disconnect").Return(nil)
+		return mockClient
+	}
+	mc.pool.WithClientFactory(mockClientFactory)
 
 	start := time.Now()
 	ctx := context.Background()
