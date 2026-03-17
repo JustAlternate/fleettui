@@ -23,7 +23,6 @@ internal/
 │   └── output/         # SSH client, config loader implementations
 ├── service/            # Business logic layer
 │   └── collector.go    # Metrics collection orchestration
-└── onboarding/         # First-run setup wizard
 ```
 
 ### Key Components

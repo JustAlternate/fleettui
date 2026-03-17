@@ -11,7 +11,6 @@ import (
 	"fleettui/internal/adapters/output/config"
 	"fleettui/internal/adapters/output/ssh"
 	"fleettui/internal/domain"
-	"fleettui/internal/onboarding"
 	"fleettui/internal/ports/output"
 	"fleettui/internal/service"
 	tea "github.com/charmbracelet/bubbletea"
@@ -27,27 +26,6 @@ func main() {
 
 	if *hostsFlag != "" {
 		hostsPath = *hostsFlag
-	}
-
-	if *hostsFlag == "" {
-		if _, err := os.Stat(configDir); os.IsNotExist(err) {
-			fmt.Println("Welcome to FleetTUI!")
-			fmt.Println("It looks like this is your first time running the application.")
-			fmt.Println()
-
-			completed, err := onboarding.Run()
-			if err != nil {
-				log.Fatalf("Onboarding failed: %v", err)
-			}
-
-			if !completed {
-				fmt.Println("\nOnboarding cancelled. Exiting...")
-				os.Exit(0)
-			}
-
-			fmt.Println("\nConfiguration complete! Starting FleetTUI...")
-			fmt.Println()
-		}
 	}
 
 	loader := config.NewLoader()
