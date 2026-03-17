@@ -5,12 +5,15 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
 	"fleettui/internal/domain"
 	"fleettui/internal/ports/output"
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/crypto/ssh/agent"
 )
 
 const (
@@ -23,6 +26,7 @@ type Client struct {
 	client        *ssh.Client
 	node          *domain.Node
 	lastNet       *netStats
+	lastCPU       *cpuStats
 	stopKeepalive chan struct{}
 }
 
@@ -30,6 +34,11 @@ type netStats struct {
 	rxBytes   uint64
 	txBytes   uint64
 	timestamp time.Time
+}
+
+type cpuStats struct {
+	total uint64
+	idle  uint64
 }
 
 func NewClient() output.SSHClient {
@@ -45,21 +54,37 @@ func (c *Client) Connect(ctx context.Context, node *domain.Node) error {
 	}
 	c.mu.Unlock()
 
-	key, err := os.ReadFile(node.SSHKeyPath)
-	if err != nil {
-		return fmt.Errorf("failed to read SSH key: %w", err)
+	var authMethods []ssh.AuthMethod
+
+	keyPath := node.SSHKeyPath
+	if keyPath != "" {
+		if strings.HasPrefix(keyPath, "~/") {
+			home, err := os.UserHomeDir()
+			if err == nil {
+				keyPath = filepath.Join(home, keyPath[2:])
+			}
+		}
+		key, err := os.ReadFile(keyPath)
+		if err != nil {
+			return fmt.Errorf("failed to read SSH key: %w", err)
+		}
+		signer, err := ssh.ParsePrivateKey(key)
+		if err != nil {
+			return fmt.Errorf("failed to parse SSH key: %w", err)
+		}
+		authMethods = append(authMethods, ssh.PublicKeys(signer))
 	}
 
-	signer, err := ssh.ParsePrivateKey(key)
-	if err != nil {
-		return fmt.Errorf("failed to parse SSH key: %w", err)
+	if sshAuthSock := os.Getenv("SSH_AUTH_SOCK"); sshAuthSock != "" {
+		if agentConn, err := net.Dial("unix", sshAuthSock); err == nil {
+			agentClient := agent.NewClient(agentConn)
+			authMethods = append([]ssh.AuthMethod{ssh.PublicKeysCallback(agentClient.Signers)}, authMethods...)
+		}
 	}
 
 	config := &ssh.ClientConfig{
-		User: node.User,
-		Auth: []ssh.AuthMethod{
-			ssh.PublicKeys(signer),
-		},
+		User:            node.User,
+		Auth:            authMethods,
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
 

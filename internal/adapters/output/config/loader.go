@@ -101,6 +101,9 @@ func (l *Loader) LoadHosts(path string) (*domain.HostsConfig, error) {
 	defaultKey := l.findFirstSSHKey(sshDir)
 
 	for i := range hostsCfg.Hosts {
+		if hostsCfg.Hosts[i].IP == "" {
+			hostsCfg.Hosts[i].IP = hostsCfg.Hosts[i].Name
+		}
 		if hostsCfg.Hosts[i].User == "" {
 			hostsCfg.Hosts[i].User = "root"
 		}

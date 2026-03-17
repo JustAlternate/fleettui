@@ -11,60 +11,34 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-func TestCollector_CollectCPU(t *testing.T) {
+func TestCollector_ParseCPU(t *testing.T) {
 	tests := []struct {
 		name      string
 		output    string
-		cmdError  error
 		wantUsage float64
 		wantErr   bool
 	}{
 		{
 			name:      "parses valid CPU usage",
-			output:    "45.3",
-			cmdError:  nil,
-			wantUsage: 45.3,
+			output:    "cpu  1000 0 1000 8000 0 0 0 0 0 0",
+			wantUsage: 20.0,
 			wantErr:   false,
 		},
 		{
 			name:      "parses zero CPU usage",
-			output:    "0.0",
-			cmdError:  nil,
+			output:    "cpu  0 0 0 10000 0 0 0 0 0 0",
 			wantUsage: 0.0,
 			wantErr:   false,
 		},
 		{
-			name:      "parses 100% CPU usage",
-			output:    "100.0",
-			cmdError:  nil,
-			wantUsage: 100.0,
-			wantErr:   false,
-		},
-		{
-			name:      "handles whitespace in output",
-			output:    "  67.5  ",
-			cmdError:  nil,
-			wantUsage: 67.5,
-			wantErr:   false,
-		},
-		{
-			name:      "returns error on command failure",
-			output:    "",
-			cmdError:  errors.New("connection failed"),
-			wantUsage: 0,
-			wantErr:   true,
-		},
-		{
 			name:      "returns error on invalid output",
-			output:    "invalid",
-			cmdError:  nil,
+			output:    "cpu invalid",
 			wantUsage: 0,
 			wantErr:   true,
 		},
 		{
 			name:      "returns error on empty output",
 			output:    "",
-			cmdError:  nil,
 			wantUsage: 0,
 			wantErr:   true,
 		},
@@ -73,10 +47,8 @@ func TestCollector_CollectCPU(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockClient := new(mocks.MockSSHClient)
-			mockClient.On("ExecuteCommand", mock.Anything, mock.Anything).Return(tt.output, tt.cmdError)
-
 			collector := &Collector{client: mockClient}
-			metrics, err := collector.collectCPU(context.Background())
+			metrics, err := collector.parseCPU(tt.output)
 
 			if tt.wantErr {
 				if err == nil {
@@ -90,18 +62,17 @@ func TestCollector_CollectCPU(t *testing.T) {
 				return
 			}
 
-			if metrics.UsagePercent != tt.wantUsage {
+			if metrics.UsagePercent < tt.wantUsage-0.01 || metrics.UsagePercent > tt.wantUsage+0.01 {
 				t.Errorf("UsagePercent = %v, want %v", metrics.UsagePercent, tt.wantUsage)
 			}
 		})
 	}
 }
 
-func TestCollector_CollectRAM(t *testing.T) {
+func TestCollector_ParseRAM(t *testing.T) {
 	tests := []struct {
 		name          string
 		output        string
-		cmdError      error
 		wantTotal     uint64
 		wantUsed      uint64
 		wantUsagePerc float64
@@ -109,8 +80,7 @@ func TestCollector_CollectRAM(t *testing.T) {
 	}{
 		{
 			name:          "parses valid RAM metrics",
-			output:        "8589934592 4294967296",
-			cmdError:      nil,
+			output:        "MemTotal:       8388608 kB\nMemAvailable:   4194304 kB\n",
 			wantTotal:     8589934592,
 			wantUsed:      4294967296,
 			wantUsagePerc: 50.0,
@@ -118,8 +88,7 @@ func TestCollector_CollectRAM(t *testing.T) {
 		},
 		{
 			name:          "parses zero usage",
-			output:        "8589934592 0",
-			cmdError:      nil,
+			output:        "MemTotal:       8388608 kB\nMemAvailable:   8388608 kB\n",
 			wantTotal:     8589934592,
 			wantUsed:      0,
 			wantUsagePerc: 0.0,
@@ -127,49 +96,29 @@ func TestCollector_CollectRAM(t *testing.T) {
 		},
 		{
 			name:          "parses full usage",
-			output:        "8589934592 8589934592",
-			cmdError:      nil,
+			output:        "MemTotal:       8388608 kB\nMemAvailable:   0 kB\n",
 			wantTotal:     8589934592,
 			wantUsed:      8589934592,
 			wantUsagePerc: 100.0,
 			wantErr:       false,
 		},
 		{
-			name:          "handles whitespace",
-			output:        "  8589934592   4294967296  ",
-			cmdError:      nil,
-			wantTotal:     8589934592,
-			wantUsed:      4294967296,
-			wantUsagePerc: 50.0,
-			wantErr:       false,
+			name:    "returns error on invalid format",
+			output:  "MemTotal: invalid",
+			wantErr: true,
 		},
 		{
-			name:     "returns error on command failure",
-			output:   "",
-			cmdError: errors.New("connection failed"),
-			wantErr:  true,
-		},
-		{
-			name:     "returns error on invalid format",
-			output:   "only_one_value",
-			cmdError: nil,
-			wantErr:  true,
-		},
-		{
-			name:     "returns error on non-numeric values",
-			output:   "total used",
-			cmdError: nil,
-			wantErr:  true,
+			name:    "returns error on missing MemTotal",
+			output:  "MemAvailable:   4194304 kB\n",
+			wantErr: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockClient := new(mocks.MockSSHClient)
-			mockClient.On("ExecuteCommand", mock.Anything, mock.Anything).Return(tt.output, tt.cmdError)
-
 			collector := &Collector{client: mockClient}
-			metrics, err := collector.collectRAM(context.Background())
+			metrics, err := collector.parseRAM(tt.output)
 
 			if tt.wantErr {
 				if err == nil {
@@ -189,7 +138,6 @@ func TestCollector_CollectRAM(t *testing.T) {
 			if metrics.UsedBytes != tt.wantUsed {
 				t.Errorf("UsedBytes = %v, want %v", metrics.UsedBytes, tt.wantUsed)
 			}
-			// Allow small floating point differences
 			if metrics.UsagePercent < tt.wantUsagePerc-0.01 || metrics.UsagePercent > tt.wantUsagePerc+0.01 {
 				t.Errorf("UsagePercent = %v, want %v", metrics.UsagePercent, tt.wantUsagePerc)
 			}
@@ -197,68 +145,40 @@ func TestCollector_CollectRAM(t *testing.T) {
 	}
 }
 
-func TestCollector_CollectUptime(t *testing.T) {
+func TestCollector_ParseUptime(t *testing.T) {
 	tests := []struct {
-		name     string
-		output   string
-		cmdError error
-		wantMin  time.Duration
-		wantMax  time.Duration
-		wantErr  bool
+		name    string
+		output  string
+		wantMin time.Duration
+		wantMax time.Duration
+		wantErr bool
 	}{
 		{
-			name:     "parses valid uptime in seconds",
-			output:   "3600.50",
-			cmdError: nil,
-			wantMin:  3600 * time.Second,
-			wantMax:  3601 * time.Second,
-			wantErr:  false,
+			name:    "parses valid uptime in seconds",
+			output:  "3600.50 1234.5",
+			wantMin: 3600 * time.Second,
+			wantMax: 3601 * time.Second,
+			wantErr: false,
 		},
 		{
-			name:     "parses zero uptime",
-			output:   "0.0",
-			cmdError: nil,
-			wantMin:  0,
-			wantMax:  1 * time.Second,
-			wantErr:  false,
+			name:    "parses zero uptime",
+			output:  "0.0 0.0",
+			wantMin: 0,
+			wantMax: 1 * time.Second,
+			wantErr: false,
 		},
 		{
-			name:     "parses large uptime",
-			output:   "86400.00",
-			cmdError: nil,
-			wantMin:  24 * time.Hour,
-			wantMax:  24*time.Hour + time.Second,
-			wantErr:  false,
-		},
-		{
-			name:     "handles whitespace",
-			output:   "  7200.25  ",
-			cmdError: nil,
-			wantMin:  2 * time.Hour,
-			wantMax:  2*time.Hour + time.Second,
-			wantErr:  false,
-		},
-		{
-			name:     "returns error on command failure",
-			output:   "",
-			cmdError: errors.New("connection failed"),
-			wantErr:  true,
-		},
-		{
-			name:     "returns error on invalid format",
-			output:   "invalid",
-			cmdError: nil,
-			wantErr:  true,
+			name:    "returns error on invalid format",
+			output:  "invalid",
+			wantErr: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockClient := new(mocks.MockSSHClient)
-			mockClient.On("ExecuteCommand", mock.Anything, mock.Anything).Return(tt.output, tt.cmdError)
-
 			collector := &Collector{client: mockClient}
-			duration, err := collector.collectUptime(context.Background())
+			duration, err := collector.parseUptime(tt.output)
 
 			if tt.wantErr {
 				if err == nil {
@@ -279,92 +199,89 @@ func TestCollector_CollectUptime(t *testing.T) {
 	}
 }
 
-func TestCollector_CollectSystemd(t *testing.T) {
+func TestCollector_ParseNetwork(t *testing.T) {
 	tests := []struct {
-		name         string
-		failedOutput string
-		totalOutput  string
-		failedError  error
-		totalError   error
-		wantFailed   int
-		wantTotal    int
-		wantErr      bool
+		name    string
+		output  string
+		wantErr bool
 	}{
 		{
-			name:         "parses valid systemd metrics",
-			failedOutput: "2",
-			totalOutput:  "150",
-			failedError:  nil,
-			totalError:   nil,
-			wantFailed:   2,
-			wantTotal:    150,
-			wantErr:      false,
+			name:    "parses valid network output",
+			output:  "eth0: 1048576 100 0 0 0 0 0 0 1048576 100 0 0 0 0 0 0",
+			wantErr: false,
 		},
 		{
-			name:         "parses zero failed units",
-			failedOutput: "0",
-			totalOutput:  "200",
-			failedError:  nil,
-			totalError:   nil,
-			wantFailed:   0,
-			wantTotal:    200,
-			wantErr:      false,
+			name:    "returns error on invalid format",
+			output:  "invalid",
+			wantErr: true,
 		},
 		{
-			name:         "handles whitespace",
-			failedOutput: "  5  ",
-			totalOutput:  "  180  ",
-			failedError:  nil,
-			totalError:   nil,
-			wantFailed:   5,
-			wantTotal:    180,
-			wantErr:      false,
-		},
-		{
-			name:        "returns error on failed command error",
-			failedError: errors.New("command failed"),
-			wantErr:     true,
-		},
-		{
-			name:         "returns error on total command error",
-			failedOutput: "0",
-			failedError:  nil,
-			totalError:   errors.New("command failed"),
-			wantErr:      true,
-		},
-		{
-			name:         "returns error on invalid failed count",
-			failedOutput: "invalid",
-			failedError:  nil,
-			totalOutput:  "100",
-			totalError:   nil,
-			wantErr:      true,
-		},
-		{
-			name:         "returns error on invalid total count",
-			failedOutput: "0",
-			failedError:  nil,
-			totalOutput:  "invalid",
-			totalError:   nil,
-			wantErr:      true,
+			name:    "returns error on missing fields",
+			output:  "eth0: 100 100",
+			wantErr: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockClient := new(mocks.MockSSHClient)
-
-			// Set up mock expectations based on command content
-			mockClient.On("ExecuteCommand", mock.Anything, mock.MatchedBy(func(cmd string) bool {
-				return contains(cmd, "--failed")
-			})).Return(tt.failedOutput, tt.failedError)
-
-			mockClient.On("ExecuteCommand", mock.Anything, mock.MatchedBy(func(cmd string) bool {
-				return contains(cmd, "list-units")
-			})).Return(tt.totalOutput, tt.totalError)
-
 			collector := &Collector{client: mockClient}
-			metrics, err := collector.collectSystemd(context.Background())
+			_, err := collector.parseNetwork(tt.output, &domain.Node{})
+
+			if tt.wantErr {
+				if err == nil {
+					t.Error("expected error, got nil")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+				return
+			}
+		})
+	}
+}
+
+func TestCollector_ParseSystemd(t *testing.T) {
+	tests := []struct {
+		name       string
+		output     string
+		wantFailed int
+		wantTotal  int
+		wantErr    bool
+	}{
+		{
+			name:       "parses valid systemd metrics",
+			output:     "2\n150",
+			wantFailed: 2,
+			wantTotal:  150,
+			wantErr:    false,
+		},
+		{
+			name:       "parses zero failed units",
+			output:     "0\n200",
+			wantFailed: 0,
+			wantTotal:  200,
+			wantErr:    false,
+		},
+		{
+			name:    "returns error on insufficient fields",
+			output:  "2",
+			wantErr: true,
+		},
+		{
+			name:    "returns error on invalid failed count",
+			output:  "invalid\n100",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockClient := new(mocks.MockSSHClient)
+			collector := &Collector{client: mockClient}
+			metrics, err := collector.parseSystemd(tt.output)
 
 			if tt.wantErr {
 				if err == nil {
@@ -388,50 +305,37 @@ func TestCollector_CollectSystemd(t *testing.T) {
 	}
 }
 
-func TestCollector_CollectOS(t *testing.T) {
+func TestCollector_ParseOS(t *testing.T) {
 	tests := []struct {
-		name     string
-		output   string
-		cmdError error
-		wantOS   string
-		wantErr  bool
+		name    string
+		output  string
+		wantOS  string
+		wantErr bool
 	}{
 		{
-			name:     "parses valid OS info",
-			output:   "Ubuntu 22.04.3 LTS",
-			cmdError: nil,
-			wantOS:   "Ubuntu 22.04.3 LTS",
-			wantErr:  false,
+			name:    "parses valid OS info",
+			output:  "NAME=\"Ubuntu\"\nPRETTY_NAME=\"Ubuntu 22.04.3 LTS\"\n",
+			wantOS:  "Ubuntu 22.04.3 LTS",
+			wantErr: false,
 		},
 		{
-			name:     "handles whitespace",
-			output:   "  Debian GNU/Linux 11  ",
-			cmdError: nil,
-			wantOS:   "Debian GNU/Linux 11",
-			wantErr:  false,
+			name:    "returns error on empty output",
+			output:  "",
+			wantOS:  "",
+			wantErr: true,
 		},
 		{
-			name:     "handles empty output",
-			output:   "",
-			cmdError: nil,
-			wantOS:   "",
-			wantErr:  false,
-		},
-		{
-			name:     "returns error on command failure",
-			output:   "",
-			cmdError: errors.New("connection failed"),
-			wantErr:  true,
+			name:    "returns error on missing PRETTY_NAME",
+			output:  "NAME=\"Ubuntu\"\n",
+			wantErr: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockClient := new(mocks.MockSSHClient)
-			mockClient.On("ExecuteCommand", mock.Anything, mock.Anything).Return(tt.output, tt.cmdError)
-
 			collector := &Collector{client: mockClient}
-			os, err := collector.collectOS(context.Background())
+			os, err := collector.parseOS(tt.output)
 
 			if tt.wantErr {
 				if err == nil {
@@ -476,7 +380,7 @@ func TestCollector_Connectivity_ViaDirect_Connect(t *testing.T) {
 			mockClient.On("Connect", mock.Anything, mock.Anything).Return(tt.connectErr)
 
 			if tt.connectErr == nil {
-				mockClient.On("ExecuteCommand", mock.Anything, mock.Anything).Return("Ubuntu 22.04", nil)
+				mockClient.On("ExecuteCommand", mock.Anything, mock.Anything).Return("---FLEETTUI_SEP_OS---\nPRETTY_NAME=\"Ubuntu 22.04\"", nil)
 			}
 
 			collector := &Collector{client: mockClient}
@@ -532,7 +436,7 @@ func TestCollector_CollectMetrics_Connectivity(t *testing.T) {
 			mockClient.On("Connect", mock.Anything, mock.Anything).Return(tt.connectErr)
 
 			if tt.connectErr == nil {
-				mockClient.On("ExecuteCommand", mock.Anything, mock.Anything).Return("Ubuntu 22.04", nil)
+				mockClient.On("ExecuteCommand", mock.Anything, mock.Anything).Return("---FLEETTUI_SEP_OS---\nPRETTY_NAME=\"Ubuntu 22.04\"", nil)
 			}
 
 			collector := &Collector{client: mockClient}
@@ -561,18 +465,4 @@ func TestCollector_CollectMetrics_Connectivity(t *testing.T) {
 			}
 		})
 	}
-}
-
-// Helper function
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > 0 && containsHelper(s, substr))
-}
-
-func containsHelper(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
 }

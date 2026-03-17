@@ -65,7 +65,8 @@ func main() {
 		return ssh.NewCollector(client)
 	}
 
-	collector := service.NewMetricsCollector(cfg, nodes, collectorFactory)
+	pool := ssh.NewConnectionPool()
+	collector := service.NewMetricsCollector(cfg, nodes, pool, collectorFactory)
 
 	model := tui.NewModel(nodes, cfg, collector)
 

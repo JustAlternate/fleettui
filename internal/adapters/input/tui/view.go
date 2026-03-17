@@ -114,7 +114,10 @@ func (m *Model) renderNodeCard(node *domain.Node) string {
 	} else if !node.IsAvailable() {
 		if node.Error != "" {
 			lines = append(lines, m.renderRow("Status:", CriticalStyle.Render("Error")))
-			lines = append(lines, m.renderRow("Error:", truncateString(node.Error, 25)))
+			errorStyle := lipgloss.NewStyle().Foreground(ColorCritical).Width(24)
+			lines = append(lines, lipgloss.JoinHorizontal(lipgloss.Top,
+				LabelStyle.Render("Error:"),
+				errorStyle.Render(node.Error)))
 		} else {
 			lines = append(lines, m.renderRow("Status:", CriticalStyle.Render("Offline")))
 		}

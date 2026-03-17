@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"fleettui/internal/adapters/output/ssh"
 	"fleettui/internal/domain"
 	"fleettui/internal/mocks"
 	"fleettui/internal/ports/output"
@@ -55,7 +56,8 @@ func TestNewMetricsCollector(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			collector := NewMetricsCollector(tt.config, tt.nodes, tt.factory)
+			pool := ssh.NewConnectionPool()
+			collector := NewMetricsCollector(tt.config, tt.nodes, pool, tt.factory)
 
 			if tt.wantNil && collector != nil {
 				t.Error("expected nil collector, got non-nil")
@@ -104,7 +106,8 @@ func TestMetricsCollector_GetNodes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mc := NewMetricsCollector(&domain.Config{}, tt.nodes, nil)
+			pool := ssh.NewConnectionPool()
+			mc := NewMetricsCollector(&domain.Config{}, tt.nodes, pool, nil)
 
 			result := mc.GetNodes()
 
@@ -114,16 +117,16 @@ func TestMetricsCollector_GetNodes(t *testing.T) {
 
 			if tt.wantCount > 0 {
 				for i, node := range tt.nodes {
-					if result[i] != node {
-						t.Errorf("GetNodes()[%d] = %v, want %v", i, result[i], node)
+					if result[i].Name != node.Name || result[i].IP != node.IP {
+						t.Errorf("GetNodes()[%d] = %v, want matching Name/IP", i, result[i])
 					}
 				}
 
-				// Note: GetNodes() does a shallow copy (slice copy, not deep copy of nodes)
-				// Modifying result[i] will modify the original node
+				// Note: GetNodes() does a deep copy now.
+				// Modifying result[i] will NOT modify the original node
 				result[0].Name = "modified"
-				if tt.nodes[0].Name != "modified" {
-					t.Error("GetNodes() returned copy of node, expected same reference (shallow copy)")
+				if tt.nodes[0].Name == "modified" {
+					t.Error("GetNodes() returned a shallow copy, expected deep copy")
 				}
 			}
 		})
@@ -131,10 +134,11 @@ func TestMetricsCollector_GetNodes(t *testing.T) {
 }
 
 func TestMetricsCollector_GetNodes_ThreadSafety(t *testing.T) {
+	pool := ssh.NewConnectionPool()
 	mc := NewMetricsCollector(&domain.Config{}, []*domain.Node{
 		{Name: "node1", IP: "192.168.1.1"},
 		{Name: "node2", IP: "192.168.1.2"},
-	}, nil)
+	}, pool, nil)
 
 	done := make(chan bool)
 	results := make(chan []*domain.Node, 100)
@@ -185,6 +189,7 @@ func TestMetricsCollector_CollectAll_Success(t *testing.T) {
 	mc := NewMetricsCollector(
 		&domain.Config{RefreshRate: 5 * time.Second},
 		nodes,
+		ssh.NewConnectionPool(),
 		mockFactory,
 	)
 
@@ -233,6 +238,7 @@ func TestMetricsCollector_CollectAll_WithErrors(t *testing.T) {
 	mc := NewMetricsCollector(
 		&domain.Config{RefreshRate: 5 * time.Second},
 		nodes,
+		ssh.NewConnectionPool(),
 		mockFactory,
 	)
 
@@ -263,6 +269,7 @@ func TestMetricsCollector_CollectAll_NoFactory(t *testing.T) {
 	mc := NewMetricsCollector(
 		&domain.Config{RefreshRate: 5 * time.Second},
 		nodes,
+		ssh.NewConnectionPool(),
 		nil, // No factory provided
 	)
 	mockClientFactory := func() output.SSHClient {
@@ -294,6 +301,7 @@ func TestMetricsCollector_CollectAll_EmptyNodes(t *testing.T) {
 	mc := NewMetricsCollector(
 		&domain.Config{RefreshRate: 5 * time.Second},
 		[]*domain.Node{}, // Empty nodes
+		ssh.NewConnectionPool(),
 		mockFactory,
 	)
 	mockClientFactory := func() output.SSHClient {
@@ -330,6 +338,7 @@ func TestMetricsCollector_Start(t *testing.T) {
 			mc := NewMetricsCollector(
 				&domain.Config{RefreshRate: tt.refreshRate},
 				[]*domain.Node{},
+				ssh.NewConnectionPool(),
 				nil,
 			)
 
@@ -376,6 +385,7 @@ func TestMetricsCollector_CollectAll_Concurrent(t *testing.T) {
 	mc := NewMetricsCollector(
 		&domain.Config{RefreshRate: 5 * time.Second},
 		nodes,
+		ssh.NewConnectionPool(),
 		mockFactory,
 	)
 

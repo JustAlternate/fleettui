@@ -45,18 +45,19 @@ fleettui -hosts ./hosts.yaml
 
 ```yaml
 hosts:
-  - name: server-01              # Display name
-    ip: 192.168.1.10             # IP address (default SSH port 22)
+  - name: server-01              # Display name (also used as IP if ip omitted)
+    ip: 192.168.1.10             # IP address (default SSH port 22). Optional if name resolves.
     user: root                   # SSH user (default: root)
-    ssh_key_path: ~/.ssh/id_rsa  # Optional: specific SSH key
+    ssh_key_path: ~/.ssh/id_rsa  # Optional: uses ssh-agent if not specified
   - name: server-02
     ip: 192.168.1.11:2222        # Custom SSH port supported
     user: admin
 ```
 
 **Notes:**
+- If `ip` is not specified, the `name` is used as the hostname/IP
 - If `user` is not specified, defaults to `root`
-- If `ssh_key_path` is not specified, uses the first key found in `~/.ssh/`
+- If `ssh_key_path` is not specified, uses `ssh-agent` if available
 - Custom SSH port can be specified in `ip` field (e.g., `192.168.1.10:2222`)
 
 ### Application Configuration (`config.yaml`)
@@ -75,7 +76,7 @@ metrics:                      # Enabled metrics
 
 ## Requirements
 
-- Remote hosts must have standard Linux utilities (`top`, `free`, `cat`, `systemctl`)
+- Remote hosts must have SSH access and read access to `/proc` filesystem (standard on Linux)
 
 ## Development
 

@@ -45,7 +45,8 @@ func TestNode_IsAvailable(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
+	for i := range tests {
+		tt := &tests[i]
 		t.Run(tt.name, func(t *testing.T) {
 			got := tt.node.IsAvailable()
 			if got != tt.wantAvailable {
@@ -84,7 +85,8 @@ func TestNode_HasFailedUnits(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
+	for i := range tests {
+		tt := &tests[i]
 		t.Run(tt.name, func(t *testing.T) {
 			got := tt.node.HasFailedUnits()
 			if got != tt.wantHasFailed {

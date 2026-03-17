@@ -21,11 +21,11 @@ type MetricsCollector struct {
 	mu               sync.RWMutex
 }
 
-func NewMetricsCollector(config *domain.Config, nodes []*domain.Node, collectorFactory CollectorFactory) *MetricsCollector {
+func NewMetricsCollector(config *domain.Config, nodes []*domain.Node, pool *ssh.ConnectionPool, collectorFactory CollectorFactory) *MetricsCollector {
 	return &MetricsCollector{
 		config:           config,
 		nodes:            nodes,
-		pool:             ssh.NewConnectionPool(),
+		pool:             pool,
 		collectorFactory: collectorFactory,
 	}
 }
@@ -51,27 +51,33 @@ func (mc *MetricsCollector) CollectAll(ctx context.Context) {
 func (mc *MetricsCollector) collectNode(ctx context.Context, node *domain.Node) {
 	// Check if node is in backoff
 	if mc.pool.IsInBackoff(node.IP) {
+		node.Mu.Lock()
 		node.Error = "Connection failed, backing off..."
 		node.Metrics.Connectivity = false
 		node.LastUpdated = time.Now()
+		node.Mu.Unlock()
 		return
 	}
 
 	var collector output.MetricsCollector
 
 	if mc.collectorFactory == nil {
+		node.Mu.Lock()
 		node.Error = "collector factory not configured"
 		node.Metrics.Connectivity = false
 		node.LastUpdated = time.Now()
+		node.Mu.Unlock()
 		return
 	}
 
 	client, err := mc.pool.Get(ctx, node)
 	if err != nil {
 		mc.pool.RecordFailure(node.IP)
+		node.Mu.Lock()
 		node.Error = err.Error()
 		node.Metrics.Connectivity = false
 		node.LastUpdated = time.Now()
+		node.Mu.Unlock()
 		return
 	}
 	defer mc.pool.Return(node.IP)
@@ -79,6 +85,10 @@ func (mc *MetricsCollector) collectNode(ctx context.Context, node *domain.Node) 
 	collector = mc.collectorFactory(client)
 
 	metrics, err := collector.CollectMetrics(ctx, node, mc.config)
+
+	node.Mu.Lock()
+	defer node.Mu.Unlock()
+
 	if err != nil {
 		mc.pool.RecordFailure(node.IP)
 		node.Error = err.Error()
@@ -97,7 +107,21 @@ func (mc *MetricsCollector) GetNodes() []*domain.Node {
 	defer mc.mu.RUnlock()
 
 	result := make([]*domain.Node, len(mc.nodes))
-	copy(result, mc.nodes)
+	for i, n := range mc.nodes {
+		n.Mu.RLock()
+		copyNode := &domain.Node{
+			Name:        n.Name,
+			IP:          n.IP,
+			User:        n.User,
+			SSHKeyPath:  n.SSHKeyPath,
+			OSInfo:      n.OSInfo,
+			Metrics:     n.Metrics,
+			LastUpdated: n.LastUpdated,
+			Error:       n.Error,
+		}
+		n.Mu.RUnlock()
+		result[i] = copyNode
+	}
 	return result
 }
 

@@ -1,10 +1,12 @@
 package domain
 
 import (
+	"sync"
 	"time"
 )
 
 type Node struct {
+	Mu          sync.RWMutex
 	Name        string
 	IP          string
 	User        string
