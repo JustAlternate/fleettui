@@ -4,8 +4,8 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"fleettui/internal/domain"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/justalternate/fleetui/internal/domain"
 )
 
 var (

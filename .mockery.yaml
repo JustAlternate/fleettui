@@ -6,7 +6,7 @@ outpkg: mocks
 with-expecter: true
 keeptree: false
 packages:
-  fleettui/internal/ports/output:
+  github.com/justalternate/fleetui/internal/ports/output:
     interfaces:
       SSHClient:
         config:

@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"fleettui/internal/domain"
+	"github.com/justalternate/fleetui/internal/domain"
 	"gopkg.in/yaml.v3"
 )
 

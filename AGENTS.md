@@ -4,7 +4,7 @@
 
 FleetTUI is a terminal UI application for monitoring server fleets in real-time. Built with Go using the Charm stack (Bubble Tea, Lipgloss, Bubbles).
 
-Repects KISS and vim binding
+Repects KISS and Vim binding when adding new features
 
 ### Architecture
 
@@ -16,7 +16,6 @@ internal/
 │   ├── node.go         # Node entity with availability checks
 │   └── metrics.go      # Metrics types and configuration
 ├── ports/              # Interface definitions (primary/secondary adapters)
-│   ├── input/          # Input ports (commands)
 │   └── output/         # Output ports (SSH, config loader interfaces)
 ├── adapters/           # Implementation of ports
 │   ├── input/          # TUI adapter (Bubble Tea)
@@ -57,8 +56,7 @@ internal/
 
 - Use **table-driven tests** for all test cases
 - Use **testify/mock** (via mockery) for mocking interfaces
-- Place tests in same package as code (`package domain` not `package domain_test`)
-- Use `t.TempDir()` for temporary files in tests
+- Place tests in same package as code. 
 - Test both success and failure paths
 
 ### Mock Generation
@@ -68,9 +66,6 @@ Mocks are generated using mockery. Configuration is in `.mockery.yaml`.
 ```bash
 # Generate/update all mocks
 mockery --all
-
-# Or with go generate (if configured)
-go generate ./...
 ```
 
 ### Code Quality
@@ -78,13 +73,6 @@ go generate ./...
 **ALL code changes MUST be formatted and linted before submission:**
 
 ```bash
-# Format Go code
-gofmt -w .
-
-# Run linter
-golangci-lint run
-
-# Or run both
 gofmt -w . && golangci-lint run
 ```
 
@@ -93,9 +81,6 @@ gofmt -w . && golangci-lint run
 ```bash
 # Run all tests
 go test ./...
-
-# Run with coverage
-go test -cover ./...
 
 # Run specific package tests
 go test ./internal/domain/...
@@ -110,8 +95,7 @@ When adding features to domain, config, or service layers:
 1. Write the implementation
 2. Write comprehensive tests (table-driven)
 3. Generate mocks if new interfaces are added
-4. Run `gofmt -w .`
-5. Run `golangci-lint run`
+5. Run linters && formatters
 6. Ensure all tests pass
 
 ### Project Commands
@@ -122,10 +106,6 @@ go build .
 
 # Run
 go run .
-
-# Test with coverage report
-go test -coverprofile=coverage.out ./... && go tool cover -html=coverage.out
-
-# Clean build artifacts
-rm -f fleettui coverage.out
 ```
+
+/!\ Never commit the code or push by yourself.

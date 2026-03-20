@@ -3,10 +3,10 @@ package tui
 import (
 	"context"
 
-	"fleettui/internal/domain"
-	"fleettui/internal/service"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/justalternate/fleetui/internal/domain"
+	"github.com/justalternate/fleetui/internal/service"
 )
 
 // ViewMode represents which view is currently active in the TUI.

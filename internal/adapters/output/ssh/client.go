@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"fleettui/internal/domain"
-	"fleettui/internal/ports/output"
+	"github.com/justalternate/fleetui/internal/domain"
+	"github.com/justalternate/fleetui/internal/ports/output"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
 )

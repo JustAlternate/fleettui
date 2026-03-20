@@ -7,13 +7,13 @@ import (
 	"os"
 	"path/filepath"
 
-	"fleettui/internal/adapters/input/tui"
-	"fleettui/internal/adapters/output/config"
-	"fleettui/internal/adapters/output/ssh"
-	"fleettui/internal/domain"
-	"fleettui/internal/ports/output"
-	"fleettui/internal/service"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/justalternate/fleetui/internal/adapters/input/tui"
+	"github.com/justalternate/fleetui/internal/adapters/output/config"
+	"github.com/justalternate/fleetui/internal/adapters/output/ssh"
+	"github.com/justalternate/fleetui/internal/domain"
+	"github.com/justalternate/fleetui/internal/ports/output"
+	"github.com/justalternate/fleetui/internal/service"
 )
 
 func main() {

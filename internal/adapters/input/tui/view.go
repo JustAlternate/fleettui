@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"fleettui/internal/domain"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/justalternate/fleetui/internal/domain"
 )
 
 func (m *Model) renderView() string {

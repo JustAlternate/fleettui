@@ -2,7 +2,7 @@ package output
 
 import (
 	"context"
-	"fleettui/internal/domain"
+	"github.com/justalternate/fleetui/internal/domain"
 )
 
 type SSHClient interface {

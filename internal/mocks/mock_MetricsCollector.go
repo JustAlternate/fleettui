@@ -4,7 +4,7 @@ package mocks
 
 import (
 	context "context"
-	domain "fleettui/internal/domain"
+	domain "github.com/justalternate/fleetui/internal/domain"
 
 	mock "github.com/stretchr/testify/mock"
 )

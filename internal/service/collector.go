@@ -5,9 +5,9 @@ import (
 	"sync"
 	"time"
 
-	"fleettui/internal/adapters/output/ssh"
-	"fleettui/internal/domain"
-	"fleettui/internal/ports/output"
+	"github.com/justalternate/fleetui/internal/adapters/output/ssh"
+	"github.com/justalternate/fleetui/internal/domain"
+	"github.com/justalternate/fleetui/internal/ports/output"
 )
 
 // CollectorFactory creates a MetricsCollector using the provided SSHClient
