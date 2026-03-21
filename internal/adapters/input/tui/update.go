@@ -130,7 +130,12 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.updateTableContent()
 				m.ensureCursorVisible()
 			default:
-				m.viewport.ScrollUp(count)
+				m.cursor -= count * m.getColumns()
+				if m.cursor < 0 {
+					m.cursor = 0
+				}
+				m.updateViewportContent()
+				m.ensureCardCursorVisible()
 			}
 			return m, nil
 
@@ -145,7 +150,35 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.updateTableContent()
 				m.ensureCursorVisible()
 			default:
-				m.viewport.ScrollDown(count)
+				m.cursor += count * m.getColumns()
+				if m.cursor > len(displayed)-1 {
+					m.cursor = len(displayed) - 1
+				}
+				m.updateViewportContent()
+				m.ensureCardCursorVisible()
+			}
+			return m, nil
+
+		case "left", "h":
+			if m.viewMode == ViewCards {
+				m.cursor -= count
+				if m.cursor < 0 {
+					m.cursor = 0
+				}
+				m.updateViewportContent()
+				m.ensureCardCursorVisible()
+			}
+			return m, nil
+
+		case "right", "l":
+			if m.viewMode == ViewCards {
+				displayed := m.getDisplayedNodes()
+				m.cursor += count
+				if m.cursor > len(displayed)-1 {
+					m.cursor = len(displayed) - 1
+				}
+				m.updateViewportContent()
+				m.ensureCardCursorVisible()
 			}
 			return m, nil
 
@@ -156,6 +189,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.updateTableContent()
 				m.tableViewport.SetYOffset(0)
 			default:
+				m.cursor = 0
+				m.updateViewportContent()
 				m.viewport.SetYOffset(0)
 			}
 			return m, nil
@@ -170,7 +205,11 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.ensureCursorVisible()
 				}
 			default:
-				m.viewport.GotoBottom()
+				if len(displayed) > 0 {
+					m.cursor = len(displayed) - 1
+					m.updateViewportContent()
+					m.ensureCardCursorVisible()
+				}
 			}
 			return m, nil
 		}
@@ -201,6 +240,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		m.recalcViewportHeights()
+		m.clampCursor()
 		m.updateViewportContent()
 		m.updateTableContent()
 
@@ -210,11 +250,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.searchText != "" {
 			m.applyFilter()
 		}
-		// Clamp cursor in case the node list shrank.
-		displayed := m.getDisplayedNodes()
-		if m.cursor >= len(displayed) && len(displayed) > 0 {
-			m.cursor = len(displayed) - 1
-		}
+		m.clampCursor()
 		m.updateViewportContent()
 		m.updateTableContent()
 		return m, tickCmd(m.config.RefreshRate)
@@ -227,62 +263,4 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	return m, nil
-}
-
-func (m *Model) updateViewportContent() {
-	content := m.renderCardsContent()
-	m.viewport.SetContent(content)
-}
-
-func (m *Model) updateTableContent() {
-	content := m.renderTableContent()
-	m.tableViewport.SetContent(content)
-}
-
-func (m *Model) getColumns() int {
-	columns := 3
-	if m.width < 130 {
-		columns = 2
-	}
-	if m.width < 90 {
-		columns = 1
-	}
-	return columns
-}
-
-// ensureCursorVisible scrolls the tableViewport the minimum amount needed so
-// that the cursor row is always visible. Each row is exactly 1 terminal line.
-func (m *Model) ensureCursorVisible() {
-	top := m.tableViewport.YOffset
-	bottom := top + m.tableViewport.Height - 1
-
-	if m.cursor < top {
-		// Cursor went above the visible window — scroll up to it.
-		m.tableViewport.SetYOffset(m.cursor)
-	} else if m.cursor > bottom {
-		// Cursor went below the visible window — scroll down to it.
-		m.tableViewport.SetYOffset(m.cursor - m.tableViewport.Height + 1)
-	}
-}
-
-// recalcViewportHeights recomputes viewport dimensions based on terminal size
-// and whether the search bar is currently visible.
-func (m *Model) recalcViewportHeights() {
-	contentHeight := m.height - 7
-	tableContentHeight := contentHeight - 1
-	if m.searchMode || m.searchText != "" {
-		contentHeight--
-		tableContentHeight--
-		// Extra spacer line below search bar in table view.
-		if m.viewMode == ViewTable {
-			contentHeight--
-			tableContentHeight--
-		}
-	}
-
-	m.viewport.Width = m.width
-	m.viewport.Height = contentHeight
-
-	m.tableViewport.Width = m.width
-	m.tableViewport.Height = tableContentHeight
 }
