@@ -3,7 +3,7 @@ package tui
 import (
 	"strings"
 
-	"github.com/justalternate/fleetui/internal/domain"
+	"github.com/justalternate/fleettui/internal/domain"
 )
 
 // getDisplayedNodes returns the filtered node list when a search is active,

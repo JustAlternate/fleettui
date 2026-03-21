@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/justalternate/fleetui/internal/domain"
-	"github.com/justalternate/fleetui/internal/ports/output"
+	"github.com/justalternate/fleettui/internal/domain"
+	"github.com/justalternate/fleettui/internal/ports/output"
 )
 
 // PooledConnection wraps an SSH client with metadata

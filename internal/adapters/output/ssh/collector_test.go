@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/justalternate/fleetui/internal/domain"
-	"github.com/justalternate/fleetui/internal/mocks"
+	"github.com/justalternate/fleettui/internal/domain"
+	"github.com/justalternate/fleettui/internal/mocks"
 	"github.com/stretchr/testify/mock"
 )
 

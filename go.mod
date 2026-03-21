@@ -1,4 +1,4 @@
-module github.com/justalternate/fleetui
+module github.com/justalternate/fleettui
 
 go 1.26
 

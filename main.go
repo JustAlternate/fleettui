@@ -8,12 +8,12 @@ import (
 	"path/filepath"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/justalternate/fleetui/internal/adapters/input/tui"
-	"github.com/justalternate/fleetui/internal/adapters/output/config"
-	"github.com/justalternate/fleetui/internal/adapters/output/ssh"
-	"github.com/justalternate/fleetui/internal/domain"
-	"github.com/justalternate/fleetui/internal/ports/output"
-	"github.com/justalternate/fleetui/internal/service"
+	"github.com/justalternate/fleettui/internal/adapters/input/tui"
+	"github.com/justalternate/fleettui/internal/adapters/output/config"
+	"github.com/justalternate/fleettui/internal/adapters/output/ssh"
+	"github.com/justalternate/fleettui/internal/domain"
+	"github.com/justalternate/fleettui/internal/ports/output"
+	"github.com/justalternate/fleettui/internal/service"
 )
 
 func main() {
