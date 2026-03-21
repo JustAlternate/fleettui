@@ -206,3 +206,24 @@ func renderProgressBar(percent float64, width int) string {
 
 	return filledBar + emptyBar
 }
+
+// ---------------------------------------------------------------------------
+// SSH helpers
+// ---------------------------------------------------------------------------
+
+// parseHostPort splits an address like "host:2201" into host and port.
+// If there is no port suffix, port returns "".
+func parseHostPort(addr string) (host, port string) {
+	idx := strings.LastIndex(addr, ":")
+	if idx < 0 {
+		return addr, ""
+	}
+	// Check if what follows the colon is all digits (a port number).
+	p := addr[idx+1:]
+	for _, c := range p {
+		if c < '0' || c > '9' {
+			return addr, ""
+		}
+	}
+	return addr[:idx], p
+}
