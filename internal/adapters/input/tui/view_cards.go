@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/justalternate/fleetui/internal/domain"
+	"github.com/justalternate/fleettui/internal/domain"
 )
 
 func (m *Model) renderCardsContent() string {

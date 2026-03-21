@@ -101,8 +101,8 @@ var (
 	// Panel bar styles
 
 	PanelBarStyle = lipgloss.NewStyle().
-			Background(lipgloss.Color("#1A1A2E")).
-			Padding(0, 1)
+			Background(lipgloss.Color("#141822")).
+			Padding(0, 1, 0, 0)
 
 	PanelBarNameStyle = lipgloss.NewStyle().
 				Bold(true).
@@ -118,6 +118,14 @@ var (
 
 	PanelHelpStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#666666"))
+
+	LogsCursorStyle = lipgloss.NewStyle().
+			Background(lipgloss.Color("#262f3f")).
+			Foreground(ColorPrimary)
+
+	LogsSelectedStyle = lipgloss.NewStyle().
+				Background(lipgloss.Color("#3a2f1f")).
+				Foreground(ColorPrimary)
 )
 
 // Column width constants — shared by header and row renderers for exact alignment.

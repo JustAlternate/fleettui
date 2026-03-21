@@ -6,10 +6,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/justalternate/fleetui/internal/adapters/output/ssh"
-	"github.com/justalternate/fleetui/internal/domain"
-	"github.com/justalternate/fleetui/internal/mocks"
-	"github.com/justalternate/fleetui/internal/ports/output"
+	"github.com/justalternate/fleettui/internal/adapters/output/ssh"
+	"github.com/justalternate/fleettui/internal/domain"
+	"github.com/justalternate/fleettui/internal/mocks"
+	"github.com/justalternate/fleettui/internal/ports/output"
 	"github.com/stretchr/testify/mock"
 )
 

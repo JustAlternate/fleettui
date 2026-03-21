@@ -3,7 +3,7 @@
 package mocks
 
 import (
-	domain "github.com/justalternate/fleetui/internal/domain"
+	domain "github.com/justalternate/fleettui/internal/domain"
 
 	mock "github.com/stretchr/testify/mock"
 )

@@ -49,10 +49,23 @@ func (m *Model) renderView() string {
 
 func (m *Model) renderPanelView() string {
 	bar := m.renderPanelBar()
+	logsSearch := ""
+	if m.panelKind == PanelLogs && (m.logsFilterMode || m.logsFilter != "") {
+		logsSearch = m.renderLogsSearchBar()
+	}
 	term := m.termViewport.View()
-	help := PanelHelpStyle.Render("[ctrl+q] Close panel")
+	helpText := m.panelHelp
+	if helpText == "" {
+		helpText = "[ctrl+q] Close panel"
+	}
+	help := PanelHelpStyle.Render(helpText)
 
-	panelContent := lipgloss.JoinVertical(lipgloss.Left, bar, term, help)
+	panelSections := []string{bar}
+	if logsSearch != "" {
+		panelSections = append(panelSections, logsSearch)
+	}
+	panelSections = append(panelSections, "", term, help)
+	panelContent := lipgloss.JoinVertical(lipgloss.Left, panelSections...)
 	framed := PanelFrameStyle.Render(panelContent)
 
 	wrapper := lipgloss.NewStyle().
@@ -64,27 +77,35 @@ func (m *Model) renderPanelView() string {
 	return wrapper.Render(framed)
 }
 
+func (m *Model) renderLogsSearchBar() string {
+	if m.logsFilterMode {
+		return m.logsFilterInput.View()
+	}
+
+	label := SearchFilterInfoStyle.Render("Filter: ")
+	query := SearchTextStyle.Render(m.logsFilter)
+	clear := SearchFilterInfoStyle.Render(" [esc] clear")
+	return label + query + clear
+}
+
 func (m *Model) renderPanelBar() string {
 	if m.panelNode == nil {
 		return ""
 	}
 
-	var status string
-	var statusColor lipgloss.Color
+	title := m.panelTitle
+	if title == "" {
+		title = "SSH"
+	}
 
-	switch {
-	case m.sshConnecting:
-		status = "Connecting..."
-		statusColor = ColorWarning
-	case m.sshError != "":
-		status = m.sshError
-		statusColor = ColorCritical
-	default:
+	status := m.panelStatus
+	statusColor := m.panelStatusFg
+	if status == "" {
 		status = "Connected"
 		statusColor = ColorSuccess
 	}
 
-	name := PanelBarNameStyle.Render(m.panelNode.Name)
+	name := PanelBarNameStyle.Render(title + ": " + m.panelNode.Name)
 	ip := PanelBarIPStyle.Render(m.panelNode.IP)
 	statusStyled := lipgloss.NewStyle().Foreground(statusColor).Render(status)
 
@@ -100,7 +121,7 @@ func (m *Model) renderPanelBar() string {
 }
 
 func (m *Model) renderHelp() string {
-	base := "[q] Quit • [r] Refresh • [s] SSH • [tab] Switch view • [/] Search"
+	base := "[q] Quit • [r] Refresh • [S] SSH • [L] Logs • [tab] Switch view • [/] Search"
 	switch m.viewMode {
 	case ViewTable:
 		return base + " • [j/k] Navigate • [g/G] Top/Bottom"

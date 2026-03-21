@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/justalternate/fleetui/internal/domain"
+	"github.com/justalternate/fleettui/internal/domain"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
 	"golang.org/x/crypto/ssh/knownhosts"
@@ -21,6 +21,12 @@ type sshSession struct {
 	session *ssh.Session
 	stdinW  *os.File // write end — user input goes here
 	stdoutR *os.File // read end — SSH output comes from here
+}
+
+type logsStreamSession struct {
+	client  *ssh.Client
+	session *ssh.Session
+	stdoutR *os.File
 }
 
 // connectSSH opens an interactive SSH session to the given node with PTY
@@ -113,6 +119,63 @@ func closeSSH(s *sshSession) {
 		return
 	}
 	s.stdinW.Close()
+	s.stdoutR.Close()
+	s.session.Close()
+	s.client.Close()
+}
+
+func connectLogsStream(node *domain.Node, command string) (*logsStreamSession, error) {
+	config, err := buildSSHConfig(node)
+	if err != nil {
+		return nil, fmt.Errorf("ssh config: %w", err)
+	}
+
+	host, port := parseHostPort(node.IP)
+	addr := host + ":22"
+	if port != "" {
+		addr = host + ":" + port
+	}
+
+	client, err := ssh.Dial("tcp", addr, config)
+	if err != nil {
+		return nil, fmt.Errorf("ssh dial: %w", err)
+	}
+
+	session, err := client.NewSession()
+	if err != nil {
+		client.Close()
+		return nil, fmt.Errorf("ssh session: %w", err)
+	}
+
+	stdoutR, stdoutW, err := os.Pipe()
+	if err != nil {
+		session.Close()
+		client.Close()
+		return nil, err
+	}
+
+	session.Stdout = stdoutW
+	session.Stderr = stdoutW
+
+	if err := session.Start(command); err != nil {
+		stdoutR.Close()
+		stdoutW.Close()
+		session.Close()
+		client.Close()
+		return nil, fmt.Errorf("start logs command: %w", err)
+	}
+
+	return &logsStreamSession{
+		client:  client,
+		session: session,
+		stdoutR: stdoutR,
+	}, nil
+}
+
+func closeLogsStream(s *logsStreamSession) {
+	if s == nil {
+		return
+	}
 	s.stdoutR.Close()
 	s.session.Close()
 	s.client.Close()

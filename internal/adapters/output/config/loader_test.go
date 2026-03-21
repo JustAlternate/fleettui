@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/justalternate/fleetui/internal/domain"
+	"github.com/justalternate/fleettui/internal/domain"
 )
 
 func TestLoader_LoadConfig_ValidFile(t *testing.T) {

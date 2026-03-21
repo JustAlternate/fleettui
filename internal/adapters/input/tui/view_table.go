@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/justalternate/fleetui/internal/domain"
+	"github.com/justalternate/fleettui/internal/domain"
 )
 
 // tableCell renders a plain fixed-width cell with muted foreground.

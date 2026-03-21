@@ -1,7 +1,7 @@
 package output
 
 import (
-	"github.com/justalternate/fleetui/internal/domain"
+	"github.com/justalternate/fleettui/internal/domain"
 )
 
 type ConfigLoader interface {
