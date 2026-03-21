@@ -21,11 +21,11 @@
         packages = {
           default = pkgs.buildGoModule {
             pname = "fleettui";
-            version = "1.1.0";
+            version = "1.2.0";
 
             src = ./.;
 
-            vendorHash = "sha256-0wBJ09LVFROF1sW95QJh2jPV34htZ9PnKcMpc/opJPs=";
+            vendorHash = "sha256-dGTjOHXuYItOGR+oTwWlEEdyToVXCVIK7s1hTiROLpw=";
 
             meta = with pkgs.lib; {
               description = "A TUI for managing and monitoring server fleets";
