@@ -97,6 +97,27 @@ var (
 
 	SearchFilterInfoStyle = lipgloss.NewStyle().
 				Foreground(ColorMuted)
+
+	// Panel bar styles
+
+	PanelBarStyle = lipgloss.NewStyle().
+			Background(lipgloss.Color("#1A1A2E")).
+			Padding(0, 1)
+
+	PanelBarNameStyle = lipgloss.NewStyle().
+				Bold(true).
+				Foreground(ColorSuccess)
+
+	PanelBarIPStyle = lipgloss.NewStyle().
+			Foreground(ColorMuted)
+
+	PanelFrameStyle = lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("#3C3C3C")).
+			Padding(0, 1)
+
+	PanelHelpStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#666666"))
 )
 
 // Column width constants — shared by header and row renderers for exact alignment.

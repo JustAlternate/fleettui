@@ -6,6 +6,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/x/vt"
 	"github.com/justalternate/fleetui/internal/domain"
 	"github.com/justalternate/fleetui/internal/service"
 )
@@ -18,8 +19,6 @@ const (
 	ViewCards ViewMode = iota
 	// ViewTable is the dense list/table view.
 	ViewTable
-	// ViewDetail is reserved for a future per-node detail panel.
-	// ViewDetail
 )
 
 type Model struct {
@@ -41,6 +40,18 @@ type Model struct {
 	searchMode     bool // whether the search bar is focused
 	searchText     string
 	searchInput    textinput.Model
+
+	// SSH panel state
+	panelMode     bool             // true when the SSH panel is active
+	panelNode     *domain.Node     // node being SSH'd into
+	ssh           *sshSession      // SSH connection (nil until connected)
+	emulator      *vt.SafeEmulator // terminal emulator
+	termViewport  viewport.Model   // viewport for terminal output
+	sshConnecting bool             // true while SSH handshake is in progress
+	sshError      string           // connection error to display
+	termChan      chan termChunk   // channel carrying terminal output chunks
+	termStop      chan struct{}    // closes to stop output reader goroutine
+	panelSeq      int              // monotonically increasing panel session id
 }
 
 // NewModel creates a new TUI model
@@ -61,6 +72,9 @@ func NewModel(nodes []*domain.Node, config *domain.Config, collector *service.Me
 	si.PlaceholderStyle = SearchPlaceholderStyle
 	si.CharLimit = 64
 
+	tv := viewport.New(100, 20)
+	tv.SetContent("")
+
 	return &Model{
 		nodes:         nodes,
 		config:        config,
@@ -70,6 +84,7 @@ func NewModel(nodes []*domain.Node, config *domain.Config, collector *service.Me
 		viewport:      vp,
 		tableViewport: tvp,
 		searchInput:   si,
+		termViewport:  tv,
 	}
 }
 

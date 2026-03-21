@@ -11,6 +11,12 @@ func (m *Model) renderView() string {
 		return "Loading..."
 	}
 
+	// SSH panel mode — show thin bar + terminal.
+	if m.panelMode {
+		return m.renderPanelView()
+	}
+
+	// Normal mode.
 	var sections []string
 
 	title := TitleStyle.Render("FleetTUI")
@@ -41,8 +47,60 @@ func (m *Model) renderView() string {
 	return lipgloss.JoinVertical(lipgloss.Left, sections...)
 }
 
+func (m *Model) renderPanelView() string {
+	bar := m.renderPanelBar()
+	term := m.termViewport.View()
+	help := PanelHelpStyle.Render("[ctrl+q] Close panel")
+
+	panelContent := lipgloss.JoinVertical(lipgloss.Left, bar, term, help)
+	framed := PanelFrameStyle.Render(panelContent)
+
+	wrapper := lipgloss.NewStyle().
+		Width(m.width).
+		Height(m.height).
+		Padding(1, 2).
+		Align(lipgloss.Center, lipgloss.Center)
+
+	return wrapper.Render(framed)
+}
+
+func (m *Model) renderPanelBar() string {
+	if m.panelNode == nil {
+		return ""
+	}
+
+	var status string
+	var statusColor lipgloss.Color
+
+	switch {
+	case m.sshConnecting:
+		status = "Connecting..."
+		statusColor = ColorWarning
+	case m.sshError != "":
+		status = m.sshError
+		statusColor = ColorCritical
+	default:
+		status = "Connected"
+		statusColor = ColorSuccess
+	}
+
+	name := PanelBarNameStyle.Render(m.panelNode.Name)
+	ip := PanelBarIPStyle.Render(m.panelNode.IP)
+	statusStyled := lipgloss.NewStyle().Foreground(statusColor).Render(status)
+
+	content := lipgloss.JoinHorizontal(lipgloss.Top, name, " ", ip, " ", statusStyled)
+	barWidth := m.termViewport.Width
+	if barWidth <= 0 {
+		barWidth = m.width - 8
+	}
+	if barWidth < 10 {
+		barWidth = 10
+	}
+	return PanelBarStyle.Width(barWidth).Render(content)
+}
+
 func (m *Model) renderHelp() string {
-	base := "[q] Quit • [r] Refresh • [tab] Switch view • [/] Search"
+	base := "[q] Quit • [r] Refresh • [s] SSH • [tab] Switch view • [/] Search"
 	switch m.viewMode {
 	case ViewTable:
 		return base + " • [j/k] Navigate • [g/G] Top/Bottom"
