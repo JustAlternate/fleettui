@@ -133,8 +133,8 @@ func (m *Model) renderNodeCard(node *domain.Node) string {
 		}
 
 		if m.config.IsMetricEnabled(domain.MetricNetwork) {
-			netIn := fmt.Sprintf("↓ %.2f MB/s", node.Metrics.Network.InRateMBps)
-			netOut := fmt.Sprintf("↑ %.2f MB/s", node.Metrics.Network.OutRateMBps)
+			netIn := fmt.Sprintf("↓ %s", formatNetworkRate(node.Metrics.Network.InRateMBps))
+			netOut := fmt.Sprintf("↑ %s", formatNetworkRate(node.Metrics.Network.OutRateMBps))
 			lines = append(lines, m.renderRow("Network:", fmt.Sprintf("%s  %s", netIn, netOut)))
 		}
 
@@ -223,6 +223,46 @@ func truncateString(s string, maxLen int) string {
 	return s[:maxLen-3] + "..."
 }
 
+func formatNetworkRate(rateMBps float64) string {
+	abs := rateMBps
+	if abs < 0 {
+		abs = -abs
+	}
+	bps := abs * 1024 * 1024
+
+	switch {
+	case bps < 1024:
+		return fmt.Sprintf("%.0f B/s", bps)
+	case bps < 1024*1024:
+		return fmt.Sprintf("%.0f KB/s", bps/1024)
+	case bps < 1024*1024*1024:
+		return fmt.Sprintf("%.0f MB/s", bps/(1024*1024))
+	default:
+		return fmt.Sprintf("%.0f GB/s", bps/(1024*1024*1024))
+	}
+}
+
+func getNetworkColor(rateMBps float64) lipgloss.Color {
+	abs := rateMBps
+	if abs < 0 {
+		abs = -abs
+	}
+	bps := abs * 1024 * 1024
+
+	switch {
+	case bps < 1024:
+		return ColorSuccess
+	case bps < 1024*1024:
+		t := bps / (1024 * 1024)
+		return interpolateColor(ColorSuccess, ColorWarning, t)
+	case bps < 1024*1024*1024:
+		t := bps / (1024 * 1024 * 1024)
+		return interpolateColor(ColorWarning, ColorCritical, t)
+	default:
+		return ColorCritical
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Table view
 // ---------------------------------------------------------------------------
@@ -262,8 +302,8 @@ func (m *Model) renderTableHeader() string {
 		cols = append(cols, tableCell("RAM%", ColWidthRAM))
 	}
 	if m.config.IsMetricEnabled(domain.MetricNetwork) {
-		cols = append(cols, tableCell("NET↓ MB/s", ColWidthNetIn))
-		cols = append(cols, tableCell("NET↑ MB/s", ColWidthNetOut))
+		cols = append(cols, tableCell("NET↓", ColWidthNetIn))
+		cols = append(cols, tableCell("NET↑", ColWidthNetOut))
 	}
 	if m.config.IsMetricEnabled(domain.MetricUptime) {
 		cols = append(cols, tableCell("UPTIME", ColWidthUptime))
@@ -361,8 +401,8 @@ func (m *Model) renderTableRow(node *domain.Node, _ int, selected bool) string {
 
 	if m.config.IsMetricEnabled(domain.MetricNetwork) {
 		if available {
-			inVal := colFg(ColorAccent).Render(fmt.Sprintf("%.2f", node.Metrics.Network.InRateMBps))
-			outVal := colFg(ColorAccent).Render(fmt.Sprintf("%.2f", node.Metrics.Network.OutRateMBps))
+			inVal := colFg(getNetworkColor(node.Metrics.Network.InRateMBps)).Render(formatNetworkRate(node.Metrics.Network.InRateMBps))
+			outVal := colFg(getNetworkColor(node.Metrics.Network.OutRateMBps)).Render(formatNetworkRate(node.Metrics.Network.OutRateMBps))
 			line += renderCell(inVal, ColWidthNetIn, bgStyle)
 			line += renderCell(outVal, ColWidthNetOut, bgStyle)
 		} else {
