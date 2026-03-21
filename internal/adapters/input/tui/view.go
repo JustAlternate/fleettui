@@ -20,6 +20,15 @@ func (m *Model) renderView() string {
 	header := lipgloss.JoinHorizontal(lipgloss.Top, title, stats)
 	sections = append(sections, HeaderStyle.Render(header))
 
+	// Search bar — visible when in search mode or when a filter is active.
+	if m.searchMode || m.searchText != "" {
+		sections = append(sections, m.renderSearchBar())
+		// Extra spacing below search bar in table view.
+		if m.viewMode == ViewTable {
+			sections = append(sections, "")
+		}
+	}
+
 	switch m.viewMode {
 	case ViewTable:
 		sections = append(sections, m.renderTableHeader())
@@ -35,7 +44,7 @@ func (m *Model) renderView() string {
 }
 
 func (m *Model) renderHelp() string {
-	base := "[q] Quit • [r] Refresh • [tab] Switch view"
+	base := "[q] Quit • [r] Refresh • [tab] Switch view • [/] Search"
 	switch m.viewMode {
 	case ViewTable:
 		return base + " • [j/k] Navigate • [g/G] Top/Bottom"
@@ -44,13 +53,33 @@ func (m *Model) renderHelp() string {
 	}
 }
 
+// renderSearchBar renders the search/filter input line.
+func (m *Model) renderSearchBar() string {
+	if m.searchMode {
+		// Show active text input.
+		return SearchBarStyle.Render(m.searchInput.View())
+	}
+
+	// Show read-only filter summary.
+	filterText := m.searchText
+	label := SearchFilterInfoStyle.Render("Filter: ")
+	query := SearchTextStyle.Render(filterText)
+	clear := SearchFilterInfoStyle.Render(" [esc] clear")
+	return SearchBarStyle.Render(label + query + clear)
+}
+
 func (m *Model) renderCardsContent() string {
-	if len(m.nodes) == 0 {
+	displayed := m.getDisplayedNodes()
+
+	if len(displayed) == 0 {
+		if m.searchText != "" {
+			return "\n  No matches for \"" + m.searchText + "\"\n"
+		}
 		return "\n  No hosts configured.\n  Add hosts to ~/.config/fleettui/hosts.yaml\n"
 	}
 
 	var cards []string
-	for _, node := range m.nodes {
+	for _, node := range displayed {
 		card := m.renderNodeCard(node)
 		cards = append(cards, card)
 	}
@@ -319,12 +348,17 @@ func (m *Model) renderTableHeader() string {
 // renderTableContent builds the full scrollable body for the table view
 // and returns it as a string to be set on the tableViewport.
 func (m *Model) renderTableContent() string {
-	if len(m.nodes) == 0 {
+	displayed := m.getDisplayedNodes()
+
+	if len(displayed) == 0 {
+		if m.searchText != "" {
+			return "\n  No matches for \"" + m.searchText + "\"\n"
+		}
 		return "\n  No hosts configured.\n  Add hosts to ~/.config/fleettui/hosts.yaml\n"
 	}
 
 	var rows []string
-	for i, node := range m.nodes {
+	for i, node := range displayed {
 		rows = append(rows, m.renderTableRow(node, i, i == m.cursor))
 	}
 

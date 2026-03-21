@@ -23,6 +23,40 @@ func animationTickCmd() tea.Cmd {
 }
 
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// When in search mode, route most keys to the text input.
+	if m.searchMode {
+		switch msg := msg.(type) {
+		case tea.KeyMsg:
+			key := msg.String()
+			switch key {
+			case "esc":
+				m.searchMode = false
+				m.searchInput.Blur()
+				m.recalcViewportHeights()
+				m.updateViewportContent()
+				m.updateTableContent()
+				return m, nil
+			case "enter":
+				m.searchMode = false
+				m.searchInput.Blur()
+				m.recalcViewportHeights()
+				m.updateViewportContent()
+				m.updateTableContent()
+				return m, nil
+			}
+
+			// Forward to text input.
+			var cmd tea.Cmd
+			m.searchInput, cmd = m.searchInput.Update(msg)
+			m.searchText = m.searchInput.Value()
+			m.applyFilter()
+			m.updateViewportContent()
+			m.updateTableContent()
+			return m, cmd
+		}
+		return m, nil
+	}
+
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		key := msg.String()
@@ -47,13 +81,35 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.countPrefix = 0
 
 		switch key {
-		case "q", "ctrl+c", "esc":
+		case "q", "ctrl+c":
 			m.cancel()
 			return m, tea.Quit
+
+		case "esc":
+			// Clear filter if one is active.
+			if m.searchText != "" {
+				m.searchText = ""
+				m.filteredNodes = nil
+				m.searchInput.SetValue("")
+				m.cursor = 0
+				m.recalcViewportHeights()
+				m.updateViewportContent()
+				m.updateTableContent()
+			}
+			return m, nil
+
+		case "/":
+			m.searchMode = true
+			m.searchInput.Focus()
+			m.recalcViewportHeights()
+			return m, nil
 
 		case "tab":
 			// Cycle through available views.
 			m.viewMode = (m.viewMode + 1) % 2 // ViewCards(0) <-> ViewTable(1)
+			if m.searchMode || m.searchText != "" {
+				m.recalcViewportHeights()
+			}
 			return m, nil
 
 		case "r":
@@ -79,11 +135,12 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 
 		case "down", "j":
+			displayed := m.getDisplayedNodes()
 			switch m.viewMode {
 			case ViewTable:
 				m.cursor += count
-				if m.cursor > len(m.nodes)-1 {
-					m.cursor = len(m.nodes) - 1
+				if m.cursor > len(displayed)-1 {
+					m.cursor = len(displayed) - 1
 				}
 				m.updateTableContent()
 				m.ensureCursorVisible()
@@ -104,10 +161,11 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 
 		case "G":
+			displayed := m.getDisplayedNodes()
 			switch m.viewMode {
 			case ViewTable:
-				if len(m.nodes) > 0 {
-					m.cursor = len(m.nodes) - 1
+				if len(displayed) > 0 {
+					m.cursor = len(displayed) - 1
 					m.updateTableContent()
 					m.ensureCursorVisible()
 				}
@@ -142,26 +200,20 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-
-		// Reserve header (~4 lines) + help bar (~3 lines) = 7 lines.
-		// Table view also has a pinned header row, so subtract 1 more.
-		contentHeight := m.height - 7
-		tableContentHeight := contentHeight - 1
-
-		m.viewport.Width = m.width
-		m.viewport.Height = contentHeight
-
-		m.tableViewport.Width = m.width
-		m.tableViewport.Height = tableContentHeight
-
+		m.recalcViewportHeights()
 		m.updateViewportContent()
 		m.updateTableContent()
 
 	case tickMsg:
 		m.nodes = m.collector.GetNodes()
+		// Re-apply filter after node refresh.
+		if m.searchText != "" {
+			m.applyFilter()
+		}
 		// Clamp cursor in case the node list shrank.
-		if m.cursor >= len(m.nodes) && len(m.nodes) > 0 {
-			m.cursor = len(m.nodes) - 1
+		displayed := m.getDisplayedNodes()
+		if m.cursor >= len(displayed) && len(displayed) > 0 {
+			m.cursor = len(displayed) - 1
 		}
 		m.updateViewportContent()
 		m.updateTableContent()
@@ -211,4 +263,26 @@ func (m *Model) ensureCursorVisible() {
 		// Cursor went below the visible window — scroll down to it.
 		m.tableViewport.SetYOffset(m.cursor - m.tableViewport.Height + 1)
 	}
+}
+
+// recalcViewportHeights recomputes viewport dimensions based on terminal size
+// and whether the search bar is currently visible.
+func (m *Model) recalcViewportHeights() {
+	contentHeight := m.height - 7
+	tableContentHeight := contentHeight - 1
+	if m.searchMode || m.searchText != "" {
+		contentHeight--
+		tableContentHeight--
+		// Extra spacer line below search bar in table view.
+		if m.viewMode == ViewTable {
+			contentHeight--
+			tableContentHeight--
+		}
+	}
+
+	m.viewport.Width = m.width
+	m.viewport.Height = contentHeight
+
+	m.tableViewport.Width = m.width
+	m.tableViewport.Height = tableContentHeight
 }
