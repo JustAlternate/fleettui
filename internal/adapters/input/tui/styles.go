@@ -85,6 +85,24 @@ var (
 				Foreground(ColorPrimary).
 				Background(lipgloss.Color("#2A2A2A")).
 				Bold(true)
+
+	// Search bar styles
+
+	SearchBarStyle = lipgloss.NewStyle().
+			Foreground(ColorMuted).
+			Padding(0, 1)
+
+	SearchPrefixStyle = lipgloss.NewStyle().
+				Foreground(ColorSuccess)
+
+	SearchTextStyle = lipgloss.NewStyle().
+			Foreground(ColorPrimary)
+
+	SearchPlaceholderStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#555555"))
+
+	SearchFilterInfoStyle = lipgloss.NewStyle().
+				Foreground(ColorMuted)
 )
 
 // Column width constants — shared by header and row renderers for exact alignment.
