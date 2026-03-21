@@ -14,7 +14,6 @@ var (
 	ColorCritical = lipgloss.Color("#FF6B6B")
 	ColorPrimary  = lipgloss.Color("#E8E8E8")
 	ColorMuted    = lipgloss.Color("#888888")
-	ColorAccent   = lipgloss.Color("#00D9FF")
 
 	TitleStyle = lipgloss.NewStyle().
 			Bold(true).
@@ -91,12 +90,12 @@ var (
 // Column width constants — shared by header and row renderers for exact alignment.
 const (
 	ColWidthName    = 16
-	ColWidthIP      = 18
+	ColWidthIP      = 16
 	ColWidthStatus  = 12
 	ColWidthCPU     = 8
 	ColWidthRAM     = 8
-	ColWidthNetIn   = 12
-	ColWidthNetOut  = 12
+	ColWidthNetIn   = 10
+	ColWidthNetOut  = 10
 	ColWidthUptime  = 10
 	ColWidthSystemd = 14
 )
