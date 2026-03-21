@@ -9,6 +9,9 @@ A TUI for monitoring your server fleet in real-time. Built with Go and the [Char
 - **Real-time Monitoring**: Track CPU, RAM, network usage, uptime, and systemd status
 - **Cards**: Each node displayed in a detailed card with progress bars and status indicators
 - **List View**: Compact tabular view for monitoring many nodes at once
+- **Interactive SSH Panel**: Open an in-app SSH terminal for the selected node (`S`), with a framed panel and `ctrl+q` to close
+- **Live Logs Panel**: Tail logs in-app (`L`) with follow/pause, filter, wrap mode, cursor navigation, and yank-to-clipboard
+- **Built-in Search/Filter**: Filter nodes from the UI with `/` (supports negation via `!query`)
 - **Parallel Collection**: Fetches metrics from all hosts concurrently using goroutines
 - **Long-lived SSH Connections**: Reuses SSH connections for efficient metrics collection
 - **Configurable**: Enable/disable specific metrics via YAML configuration
@@ -39,6 +42,39 @@ fleettui
 fleettui -hosts ./hosts.yaml
 ```
 
+### Keybindings
+
+#### Global
+
+- `q`: Quit
+- `tab`: Switch cards/table view
+- `/`: Open node filter
+- `r`: Manual refresh
+- `S`: Open SSH panel for selected node
+- `L`: Open logs panel for selected node
+
+#### Navigation
+
+- `j/k`: Up/down
+- `h/l`: Left/right (cards view)
+- `g/G`: Top/bottom
+
+#### SSH panel
+
+- `ctrl+q`: Close panel
+
+#### Logs panel
+
+- `ctrl+q`: Close panel
+- `f`: Toggle follow (streaming/pause)
+- `w`: Toggle line wrap
+- `c`: Clear buffered logs
+- `/`: Filter logs
+- `esc`: Exit/clear filter or exit selection mode
+- `j/k`, `g/G`: Cursor/navigation
+- `V`: Toggle multi-line selection
+- `y`: Yank selected line(s) to clipboard
+
 ## Configuration
 
 ### Hosts Configuration (`hosts.yaml`)
@@ -59,6 +95,7 @@ hosts:
 - If `user` is not specified, defaults to `root`
 - If `ssh_key_path` is not specified, uses `ssh-agent` if available
 - Custom SSH port can be specified in `ip` field (e.g., `192.168.1.10:2222`)
+- SSH host keys use Trust On First Use (TOFU) and are stored in `~/.ssh/known_hosts`
 
 ### Application Configuration (`config.yaml`)
 
