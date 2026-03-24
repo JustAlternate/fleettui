@@ -9,14 +9,26 @@ A TUI for monitoring your server fleet in real-time. Built with Go and the [Char
 - **Real-time Monitoring**: Track CPU, RAM, network usage, uptime, and systemd status
 - **Cards**: Each node displayed in a detailed card with progress bars and status indicators
 - **List View**: Compact tabular view for monitoring many nodes at once
-- **Interactive SSH Panel**: Open an in-app SSH terminal for the selected node (`S`), with a framed panel and `ctrl+q` to close
+- **Interactive SSH Panel**: Open an in-app SSH terminal for the selected node (`S`)
 - **Live Logs Panel**: Tail logs in-app (`L`) with follow/pause, filter, wrap mode, cursor navigation, and yank-to-clipboard
 - **Built-in Search/Filter**: Filter nodes from the UI with `/` (supports negation via `!query`)
 - **Parallel Collection**: Fetches metrics from all hosts concurrently using goroutines
-- **Long-lived SSH Connections**: Reuses SSH connections for efficient metrics collection
+- **Long-lived SSH Connections**: Reuses SSH connections for metrics collection
 - **Configurable**: Enable/disable specific metrics via YAML configuration
 
 ## Installation
+
+### Using Go
+
+```bash
+go install github.com/justalternate/fleettui
+```
+
+### Using Nix (with flakes)
+
+```bash
+nix run github:JustAlternate/fleettui
+```
 
 ### From Source
 
@@ -24,12 +36,6 @@ A TUI for monitoring your server fleet in real-time. Built with Go and the [Char
 git clone https://github.com/JustAlternate/fleettui.git
 cd fleettui
 go install .
-```
-
-### Using Nix (with flakes)
-
-```bash
-nix run github:JustAlternate/fleettui
 ```
 
 ## Usage
