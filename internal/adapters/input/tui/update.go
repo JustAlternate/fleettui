@@ -684,6 +684,8 @@ func (m *Model) updateLogsPanel(msg tea.Msg) (tea.Model, tea.Cmd) {
 				start, end := m.logsSelectionBounds()
 				m.panelStatus = fmt.Sprintf("Paused • Yanked %d lines", end-start+1)
 				m.panelStatusFg = ColorSuccess
+				m.logsSelectMode = false
+				m.logsSelectAnchor = -1
 				return m, nil
 			}
 			if m.logsFollow {
@@ -1173,8 +1175,26 @@ func (m *Model) applyLogsFilter() {
 		m.logsMatchIndex = -1
 		return
 	}
+
+	negate := false
+	if strings.HasPrefix(needle, "!") {
+		negate = true
+		needle = strings.TrimPrefix(needle, "!")
+		needle = strings.TrimSpace(needle)
+	}
+	if needle == "" {
+		m.logsViewLines = append(m.logsViewLines, m.logsRawLines...)
+		m.logsMatchIndex = -1
+		return
+	}
+
 	for _, line := range m.logsRawLines {
-		if strings.Contains(strings.ToLower(line), needle) {
+		lowerLine := strings.ToLower(line)
+		matched := strings.Contains(lowerLine, needle)
+		if negate {
+			matched = !matched
+		}
+		if matched {
 			m.logsViewLines = append(m.logsViewLines, line)
 		}
 	}

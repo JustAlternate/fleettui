@@ -79,11 +79,14 @@ func (m *Model) clampCursor() {
 }
 
 func (m *Model) getColumns() int {
-	columns := 3
-	if m.width < 130 {
+	columns := 4
+	if m.width < 168 {
+		columns = 3
+	}
+	if m.width < 126 {
 		columns = 2
 	}
-	if m.width < 90 {
+	if m.width < 84 {
 		columns = 1
 	}
 	return columns

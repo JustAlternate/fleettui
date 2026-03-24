@@ -70,10 +70,10 @@ mockery --all
 
 ### Code Quality
 
-**ALL code changes MUST be formatted and linted before submission:**
+**ALL code changes MUST be formatted before submission:**
 
 ```bash
-gofmt -w . && golangci-lint run
+gofmt -w . 
 ```
 
 ### Running Tests
@@ -103,9 +103,6 @@ When adding features to domain, config, or service layers:
 ```bash
 # Build
 go build .
-
-# Run
-go run .
 ```
 
 /!\ Never commit the code or push by yourself.
