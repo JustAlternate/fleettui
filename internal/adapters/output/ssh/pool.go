@@ -55,36 +55,45 @@ func (p *ConnectionPool) WithClientFactory(factory func() output.SSHClient) *Con
 	return p
 }
 
-// Get retrieves or creates a connection for a node
+// Get retrieves or creates a connection for a node.
+// It releases the lock during SSH connection establishment to avoid blocking
+// other goroutines that are checking healthy connections.
 func (p *ConnectionPool) Get(ctx context.Context, node *domain.Node) (output.SSHClient, error) {
 	p.mu.Lock()
-	defer p.mu.Unlock()
 
-	// Check if we should skip due to backoff
 	if backoff, exists := p.backoffs[node.IP]; exists {
 		if time.Now().Before(backoff.nextRetryTime) {
+			p.mu.Unlock()
 			return nil, fmt.Errorf("backing off, retry after %v", backoff.nextRetryTime)
 		}
 	}
 
-	// Check for existing healthy connection
 	if conn, exists := p.connections[node.IP]; exists {
 		if conn.isHealthy && time.Since(conn.lastUsed) < p.idleTimeout {
 			conn.lastUsed = time.Now()
+			p.mu.Unlock()
 			return conn.client, nil
 		}
-		// Connection is stale or unhealthy, close it
 		_ = conn.client.Disconnect()
 		delete(p.connections, node.IP)
 	}
 
-	// Create new connection
+	p.mu.Unlock()
+
 	client := p.clientFactory()
 	if err := client.Connect(ctx, node); err != nil {
 		return nil, err
 	}
 
-	// Store in pool
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if existing, exists := p.connections[node.IP]; exists {
+		_ = client.Disconnect()
+		existing.lastUsed = time.Now()
+		return existing.client, nil
+	}
+
 	p.connections[node.IP] = &PooledConnection{
 		client:    client,
 		node:      node,
