@@ -134,6 +134,7 @@ const (
 	ColWidthIP      = 16
 	ColWidthStatus  = 12
 	ColWidthCPU     = 8
+	ColWidthLoad    = 6
 	ColWidthRAM     = 8
 	ColWidthNetIn   = 10
 	ColWidthNetOut  = 10

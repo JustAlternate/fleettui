@@ -182,6 +182,20 @@ func getNetworkColor(rateMBps float64) lipgloss.Color {
 	}
 }
 
+func getLoadColor(loadAvg float64, cores uint) lipgloss.Color {
+	if cores == 0 {
+		return ColorSuccess
+	}
+	ratio := loadAvg / float64(cores)
+	if ratio > 0.85 {
+		return ColorCritical
+	}
+	if ratio > 0.5 {
+		return ColorWarning
+	}
+	return ColorSuccess
+}
+
 func renderProgressBar(percent float64, width int) string {
 	if percent < 0 {
 		percent = 0

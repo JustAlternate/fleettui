@@ -76,6 +76,12 @@ func (m *Model) renderNodeCard(node *domain.Node, selected bool) string {
 			lines = append(lines, m.renderProgressRow("RAM:", node.Metrics.RAM.UsagePercent))
 		}
 
+		if m.config.IsMetricEnabled(domain.MetricCPU) {
+			loadColor := getLoadColor(node.Metrics.CPU.LoadAvg, node.Metrics.CPU.Cores)
+			loadStyle := lipgloss.NewStyle().Foreground(loadColor)
+			lines = append(lines, m.renderRow("Load:", loadStyle.Render(fmt.Sprintf("%.2f", node.Metrics.CPU.LoadAvg))))
+		}
+
 		if m.config.IsMetricEnabled(domain.MetricNetwork) {
 			netIn := fmt.Sprintf("↓ %s", formatNetworkRate(node.Metrics.Network.InRateMBps))
 			netOut := fmt.Sprintf("↑ %s", formatNetworkRate(node.Metrics.Network.OutRateMBps))

@@ -42,6 +42,9 @@ func (m *Model) renderTableHeader() string {
 	if m.config.IsMetricEnabled(domain.MetricRAM) {
 		cols = append(cols, tableCell("RAM%", ColWidthRAM))
 	}
+	if m.config.IsMetricEnabled(domain.MetricCPU) {
+		cols = append(cols, tableCell("LOAD", ColWidthLoad))
+	}
 	if m.config.IsMetricEnabled(domain.MetricNetwork) {
 		cols = append(cols, tableCell("NET↓", ColWidthNetIn))
 		cols = append(cols, tableCell("NET↑", ColWidthNetOut))
@@ -142,6 +145,16 @@ func (m *Model) renderTableRow(node *domain.Node, _ int, selected bool) string {
 			line += renderCell(val, ColWidthRAM, bgStyle)
 		} else {
 			line += renderCell(dash, ColWidthRAM, bgStyle)
+		}
+	}
+
+	if m.config.IsMetricEnabled(domain.MetricCPU) {
+		if available {
+			loadColor := getLoadColor(node.Metrics.CPU.LoadAvg, node.Metrics.CPU.Cores)
+			load := colFg(loadColor).Render(fmt.Sprintf("%.2f", node.Metrics.CPU.LoadAvg))
+			line += renderCell(load, ColWidthLoad, bgStyle)
+		} else {
+			line += renderCell(dash, ColWidthLoad, bgStyle)
 		}
 	}
 

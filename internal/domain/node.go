@@ -28,6 +28,8 @@ type Metrics struct {
 
 type CPUMetrics struct {
 	UsagePercent float64
+	Cores        uint
+	LoadAvg      float64
 }
 
 type RAMMetrics struct {

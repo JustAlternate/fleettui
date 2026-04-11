@@ -35,7 +35,7 @@ func (c *Collector) CollectMetrics(ctx context.Context, node *domain.Node, confi
 		cmds = append(cmds, "echo '---FLEETTUI_SEP_OS---'", "cat /etc/os-release 2>/dev/null || true")
 	}
 	if config.IsMetricEnabled(domain.MetricCPU) {
-		cmds = append(cmds, "echo '---FLEETTUI_SEP_CPU---'", "grep '^cpu ' /proc/stat 2>/dev/null || true")
+		cmds = append(cmds, "echo '---FLEETTUI_SEP_CPU---'", "grep '^cpu ' /proc/stat 2>/dev/null || true", "echo '---FLEETTUI_SEP_CORES---'", "grep -c '^processor' /proc/cpuinfo 2>/dev/null || true", "echo '---FLEETTUI_SEP_LOAD---'", "awk '{print $1}' /proc/loadavg 2>/dev/null || true")
 	}
 	if config.IsMetricEnabled(domain.MetricRAM) {
 		cmds = append(cmds, "echo '---FLEETTUI_SEP_RAM---'", "cat /proc/meminfo 2>/dev/null || true")
@@ -78,6 +78,16 @@ func (c *Collector) CollectMetrics(ctx context.Context, node *domain.Node, confi
 			if cpu, err := c.parseCPU(out); err == nil {
 				metrics.CPU = cpu
 				success = true
+			}
+		}
+		if out := extractSection(outputStr, "---FLEETTUI_SEP_CORES---"); out != "" {
+			if cores, err := c.parseCores(out); err == nil {
+				metrics.CPU.Cores = cores
+			}
+		}
+		if out := extractSection(outputStr, "---FLEETTUI_SEP_LOAD---"); out != "" {
+			if load, err := c.parseLoadAvg(out); err == nil {
+				metrics.CPU.LoadAvg = load
 			}
 		}
 	}
@@ -217,6 +227,28 @@ func (c *Collector) parseCPU(output string) (domain.CPUMetrics, error) {
 	}
 
 	return domain.CPUMetrics{UsagePercent: usagePercent}, nil
+}
+
+func (c *Collector) parseCores(output string) (uint, error) {
+	if output == "" {
+		return 0, fmt.Errorf("empty cores output")
+	}
+	cores, err := strconv.ParseUint(strings.TrimSpace(output), 10, 64)
+	if err != nil {
+		return 0, err
+	}
+	return uint(cores), nil
+}
+
+func (c *Collector) parseLoadAvg(output string) (float64, error) {
+	if output == "" {
+		return 0, fmt.Errorf("empty load avg output")
+	}
+	load, err := strconv.ParseFloat(strings.TrimSpace(output), 64)
+	if err != nil {
+		return 0, err
+	}
+	return load, nil
 }
 
 func (c *Collector) parseRAM(output string) (domain.RAMMetrics, error) {
